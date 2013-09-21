@@ -208,7 +208,7 @@ $aPost = Post::getManyBySql(
 
 foreach($aPost as $oPost)
 {
-	echo $oPost->content . ' by ' . User::getById($oPost->user_id) . '<br />';
+	echo $oPost->content . ' by ' . User::getById($oPost->user_id)->firstname . '<br />';
 }
 ```
 **What happened?**
