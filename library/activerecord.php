@@ -105,7 +105,11 @@ class ActiveRecord
 			{
 				if($sTable == self::getDef('sTable')) //It's our table
 				{
-					$aResult[] = self::getObject($sObject, $aData);
+					$oObject = self::getObject($sObject, $aData);
+					if(!in_array($oObject, $aResult))
+					{
+						$aResult[] = self::getObject($sObject, $aData);
+					}
 				}
 				else
 				{
