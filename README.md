@@ -20,8 +20,6 @@ Usage
 
 Let's create one really nice User model:
 ```php
-<?php
-
 class User extends \AR\ActiveRecord
 {
 	protected static $aDefinition = array(
@@ -35,12 +33,12 @@ class User extends \AR\ActiveRecord
 		)
 	);
 
-	protected function _preGet_firstname(&$sFirstName)
+	protected function _postGet_firstname(&$sFirstName)
 	{
 		$sFirstName = ucwords(strtolower($sFirstName));
 	}
 
-	protected function _preGet_surname(&$sFirstName)
+	protected function _postGet_surname(&$sFirstName)
 	{
 		$sFirstName = ucwords(strtolower($sFirstName));
 	}
@@ -57,7 +55,7 @@ class User extends \AR\ActiveRecord
 
 	protected function _preSave_mail($sMail)
 	{
-		if(!strstr('@', $sMail))
+		if(!strstr($sMail, '@'))
 		{
 			return false;
 		}
@@ -111,22 +109,22 @@ $oUser->firstname = 'john';
 $oUser->surname = 'doe';
 //Trigger _preSet_surname() modifies it to 'Doe'
 
-$oUser->save() != true;
+$oUser->save() == false;
 //Trigger _preSave_mail() prevents us to save ActiveRecord
 
 $oUser->mail = 'john@doe.com';
 
-$oUser->save();
+$oUser->save() == true;
 //INSERT INTO user SET firstname = 'John', surname = 'Doe', mail = 'john@doe.com'
 
-$oUser2 = User::getOne(array('firstname' => 'John'));
+$oUser2 = User::getOne(array('user_id' => $oUser->getId()));
 
 $oUser === $oUser2; //They really are equal thanks to cache
 
 $oUser->firstname = 'foo bar';
 //Trigger _preSet_firstname() modifies it to 'Foo Bar'
 
-$oUser->save();
+$oUser->save() == true;
 //UPDATE user SET firstname = 'Foo Bar' WHERE user_id = '1'
 
 echo $oUser->firstname;
