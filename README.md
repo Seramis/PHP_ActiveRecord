@@ -124,6 +124,17 @@ Save
 * _postSave(field_value_array)
 	* After saving
 
+Delete
+------
+* _preDelete()
+	* Before delete
+	* All object data still usable
+	* Can return false to prevent delete command
+* _postDelete()
+	* After deletion is done
+	* Object is removed from cache
+	* Object data is still available to use here
+
 Let's play!
 ===========
 ```php
@@ -131,7 +142,6 @@ Let's play!
 //Set up connection for ActiveRecord to use
 
 $oUser = new User();
-//Create new User instance
 
 $oUser->firstname = 'john';
 //Trigger _preSet_firstname() modifies it to 'John'
@@ -151,6 +161,9 @@ $oUser2 = User::getOne(array('user_id' => $oUser->getId()));
 
 $oUser === $oUser2; //They really are equal thanks to cache
 
+$oUser->delete() == false;
+//Trigger _preDelete() prevents delete command
+
 $oUser->firstname = 'foo bar';
 //Trigger _preSet_firstname() modifies it to 'Foo Bar'
 
@@ -161,8 +174,9 @@ echo $oUser->firstname;
 //Lazy-load does loading if needed
 //Trigger _postGet_firstname() makes this value to 'Foo Bar' (even, if it is 'foo bar' in DB)
 
-$oUser->delete();
+$oUser->delete() == true;
 //DELETE FROM `user` WHERE `user_id` = 1
+//Trigger _postDelete() will echo 'Good bye!'
 ```
 
 What about data validators?

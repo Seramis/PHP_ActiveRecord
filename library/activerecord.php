@@ -285,12 +285,22 @@ class ActiveRecord
 			trigger_error('Trying to delete object that is not in DB!', E_USER_ERROR);
 		}
 
+		if(method_exists($this, '_preDelete') && $this->{'_preDelete'}() === false)
+		{
+			return false;
+		}
+
 		self::$oPdo->prepare('DELETE FROM `' . self::getDef('sTable') . '` WHERE `' . self::getDef('sIdField') . '` = ?;')
 			->execute(array($this->getId()));
 
 		//Delete object from cache
 		$sObject = get_called_class();
 		unset(self::$aCache[$sObject][$this->getId()]);
+
+		if(method_exists($this, '_postDelete'))
+		{
+			$this->{'_postDelete'}();
+		}
 
 		$this->setNotLoaded();
 
