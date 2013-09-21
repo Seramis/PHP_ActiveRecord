@@ -131,6 +131,7 @@ Let's play!
 //Set up connection for ActiveRecord to use
 
 $oUser = new User();
+//Create new User instance
 
 $oUser->firstname = 'john';
 //Trigger _preSet_firstname() modifies it to 'John'
@@ -144,7 +145,7 @@ $oUser->save() == false;
 $oUser->mail = 'john@doe.com';
 
 $oUser->save() == true;
-//INSERT INTO user SET firstname = 'John', surname = 'Doe', mail = 'john@doe.com'
+//INSERT INTO user (`firstname`,`surname`,`mail`) VALUES ('John', 'Doe', 'john@doe.com')
 
 $oUser2 = User::getOne(array('user_id' => $oUser->getId()));
 
@@ -154,12 +155,12 @@ $oUser->firstname = 'foo bar';
 //Trigger _preSet_firstname() modifies it to 'Foo Bar'
 
 $oUser->save() == true;
-//UPDATE user SET firstname = 'Foo Bar' WHERE user_id = '1'
+//UPDATE `user` SET `firstname` = 'Foo Bar' WHERE `user_id` = '1'
 
 echo $oUser->firstname;
 //Lazy-load does loading if needed
 //Trigger _postGet_firstname() makes this value to 'Foo Bar' (even, if it is 'foo bar' in DB)
 
 $oUser->delete();
-//DELETE FROM user WHERE user_id = 1
+//DELETE FROM `user` WHERE `user_id` = 1
 ```
