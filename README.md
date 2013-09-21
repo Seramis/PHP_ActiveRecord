@@ -196,7 +196,25 @@ $oUser->delete() == true;
 //Trigger _postDelete() will echo 'Good bye!'
 ```
 
+N+1 problem?
+============
+We have a solution for that too! Check that out:
+```php
+$aPost = Post::getManyBySql(
+	"SELECT %table%.*, user.* FROM %table% INNER JOIN user ON %table%.user_id = user.user_id",
+	null,
+	array('user' => 'User')
+);
+
+foreach($aPost as $oPost)
+{
+	echo $oPost->content . ' by ' . User::getById($oPost->user_id) . '<br />';
+}
+```
+**What happened?**
+As we selected data from multiple tables and we provided mapping info that user table is defining User model, ActiveRecord was able to cache all User objects what were needed. Now when we loop through posts and ask for User model with getById() method, object is returned from cache.
+
 What about data validators?
-===============
+===========================
 ActiveRecord is row in DB. DB row doesn't know, how to validate data. It knows, how to hold data. So, data validation is not a job to be done by ActiveRecord.
 If you want to add validator, it's easy: you get your favorite data validator and attach it to triggers ActiveRecord provides. No chemistry, everything is plain simple!

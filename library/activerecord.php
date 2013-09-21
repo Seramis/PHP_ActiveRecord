@@ -10,7 +10,7 @@ class ActiveRecord
 		'aField' => array()
 	);
 
-	/** @var array|ActiveRecord[] */
+	/** @var array[] */
 	private static $aCache = array();
 	/** @var \PDO */
 	private static $oPdo = null;
@@ -25,6 +25,8 @@ class ActiveRecord
 	public static function setPdo(\PDO $oPdo)
 	{
 		self::$oPdo = $oPdo;
+
+		self::$oPdo->setAttribute(\PDO::ATTR_FETCH_TABLE_NAMES, true);
 	}
 
 	/**
@@ -65,15 +67,16 @@ class ActiveRecord
 	/**
 	 * Performs SQL to provide ActiveRecord instances.
 	 * Can replace keywords:
-	 * 	%table% - ActiveRecord's table name
-	 * 	%id% - ActiveRecord's id field name
+	 *    %table% - ActiveRecord's table name
+	 *    %id% - ActiveRecord's id field name
 	 *
-	 * @param $sSql
+	 * @param string $sSql
 	 * @param null|array $aParams
+	 * @param array $aMap Mapping for preloading other object when using joins. table_name => Object_Name
 	 *
 	 * @return array|ActiveRecord[] Empty result is empty array
 	 */
-	public static function getManyBySql($sSql, $aParams = null)
+	public static function getManyBySql($sSql, $aParams = null, $aMap = array())
 	{
 		$sObject = get_called_class();
 
@@ -93,17 +96,25 @@ class ActiveRecord
 		$oStmt = self::$oPdo->prepare($sSql);
 		$oStmt->execute($aParams);
 
+		$aResultSet = self::pdoFetchAllNested($oStmt);
+
 		$aResult = array();
-		while($aData = $oStmt->fetch(\PDO::FETCH_ASSOC))
+		foreach($aResultSet as $aRow)
 		{
-			//If we have missing fields, we can not prefill object
-			if(count(array_diff(self::getDef('aField'), array_keys($aData))) > 0)
+			foreach($aRow as $sTable => $aData)
 			{
-				$aResult[] = self::getObject($sObject, $aData[self::getDef('sIdField')]);
-			}
-			else
-			{
-				$aResult[] = self::getObject($sObject, $aData[self::getDef('sIdField')], $aData);
+				if($sTable == self::getDef('sTable')) //It's our table
+				{
+					$aResult[] = self::getObject($sObject, $aData);
+				}
+				else
+				{
+					//If we have mapping for that table, cache that object
+					if(in_array($sTable, array_keys($aMap)))
+					{
+						self::getObject($aMap[$sTable], $aData);
+					}
+				}
 			}
 		}
 
@@ -131,31 +142,73 @@ class ActiveRecord
 	 * Get object from cache. If needed, create one. If possible, prefill with data.
 	 *
 	 * @param string $sObject Class name
-	 * @param string $sId
-	 * @param array $aPrefill Optional, if given, prefill is done
+	 * @param array $aDataArray Array of data. ID field is mandatory, others are optional.
 	 *
 	 * @return ActiveRecord
 	 */
-	private static function getObject($sObject, $sId, $aPrefill = array())
+    private static function getObject($sObject, $aDataArray)
+    {
+        $sId = $aDataArray[$sObject::getDef('sIdField')];
+
+        if(!$sId)
+        {
+            trigger_error('No id provided with data array!', E_USER_ERROR);
+        }
+
+        if(!array_key_exists($sObject, self::$aCache))
+        {
+            self::$aCache[$sObject] = array();
+        }
+
+        if(!array_key_exists($sId, self::$aCache[$sObject]))
+        {
+            self::$aCache[$sObject][$sId] = new $sObject($sId);
+        }
+
+        $oObject = self::$aCache[$sObject][$sId];
+
+		//If we have all fields, we can preload object
+        if(count(array_diff($sObject::getDef('aField'), array_keys($aDataArray))) == 0)
+        {
+            $oObject->loadFromArray($aDataArray);
+        }
+
+        return self::$aCache[$sObject][$sId];
+    }
+
+	/**
+	 * Returns nested array in a form:
+	 * array(
+	 *  row_counter => array(
+	 * 	 table_name => array(
+	 * 	  field_name=>field_value
+	 * 	 )
+	 * 	)
+	 * )
+	 *
+	 * @param \PDOStatement $oStmt
+	 *
+	 * @return array[]
+	 */
+	private static function pdoFetchAllNested(\PDOStatement $oStmt)
 	{
-		if(!array_key_exists($sObject, self::$aCache))
+		$aResult = array();
+
+		while(($aRowData = $oStmt->fetch(\PDO::FETCH_ASSOC)) !== false)
 		{
-			self::$aCache[$sObject] = array();
+			$aRow = array();
+
+			foreach($aRowData as $sKey => $mValue)
+			{
+				list($sTable, $sKey) = explode('.', $sKey);
+
+				$aRow[$sTable][$sKey] = $mValue;
+			}
+
+			$aResult[] = $aRow;
 		}
 
-		if(!array_key_exists($sId, self::$aCache[$sObject]))
-		{
-			self::$aCache[$sObject][$sId] = new $sObject($sId);
-		}
-
-		$oObject = self::$aCache[$sObject][$sId];
-
-		if(count($aPrefill))
-		{
-			$oObject->loadFromArray($aPrefill);
-		}
-
-		return self::$aCache[$sObject][$sId];
+		return $aResult;
 	}
 
 	/**
@@ -467,7 +520,9 @@ class ActiveRecord
 		$oStmt = self::$oPdo->prepare($sSql);
 		$oStmt->execute(array($this->getId()));
 
-		return $this->loadFromArray($oStmt->fetch(\PDO::FETCH_ASSOC));
+		$aData = self::pdoFetchAllNested($oStmt);
+
+		return $this->loadFromArray($aData[self::getDef('sTable')]);
 	}
 
 	/**
