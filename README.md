@@ -77,26 +77,51 @@ ActiveRecord has ability to execute different triggers. Triggers are (in order):
 Get
 ---
 * _preGet(field_name)
+	* Before lazy load
+	* Values are not available yet (if not loaded previously)
+	* Can return false to so get is prevented and false is returned by ActiveRecord
 * _preGet_field_name()
-* _postGet_field_name(field_value)
-* _postGet(field_name, field_value)
+	* Before lazy load
+    * Values are not available yet (if not loaded previously)
+    * Can return false to so get is prevented and false is returned by ActiveRecord
+* _postGet_field_name(&field_value)
+	* After lazyload
+	* Field value is now available
+	* Value can be modified
+* _postGet(field_name, &field_value)
+	* After lazyload
+	* Field value is now available
+	* Value can be modified
 
 Set
 ---
-* _preSet(field_name, field_value)
-* _preSet_field_name(field_value)
+* _preSet(field_name, &field_value)
+	* Before set
+	* Can modify value
+	* Can return false to prevent set
+* _preSet_field_name(&field_value)
+	* Before set
+	* Can modify value
+	* Can return false to prevent set
 * _postSet_field_name(field_value)
+	* After set
 * _postSet(field_name, field_value)
+	* After set
 
 Save
 ---
-* _preSave(field_value_array)
-* _preSave_field_name(field_value)
+* _preSave(&field_value_array)
+	* Before saving
+	* Can modify array of fields
+	* Can return false to prevent save
+* _preSave_field_name(&field_value)
+	* Before saving
+	* Can modify value
+	* Can return false to prevent save
 * _postSave_field_name(field_value)
+	* After saving
 * _postSave(field_value_array)
-
-All triggers are supported by having parameters as references. That means, you can do some data manipulation inside a trigger.
-Also, all _pre triggers are able to return 'false', if needed. That well cancel the current action and ActiveRecord will not continue with this operation.
+	* After saving
 
 Let's play!
 ===========
