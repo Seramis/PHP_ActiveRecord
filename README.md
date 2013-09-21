@@ -170,9 +170,11 @@ $oUser->mail = 'john@doe.com';
 $oUser->save() == true;
 //INSERT INTO user (`firstname`,`surname`,`mail`) VALUES ('John', 'Doe', 'john@doe.com')
 
-$oUser2 = User::getOne(array('user_id' => $oUser->getId()));
+$aUser = User::getManyBySql('SELECT %id% FROM %table% WHERE %id% = ?', array($oUser->getId()));
+//Get list of users by sql. As I don't have to know, what table name is for user, I can use %table% keyword. Same goes for id field name.
+//If we use *, ActiveRecord will find that all fields are present and will prefill object
 
-$oUser === $oUser2; //They really are equal thanks to cache
+$oUser === $aUser[0]; //They really are equal thanks to cache
 
 $oUser->delete() == false;
 //Trigger _preDelete() prevents delete command

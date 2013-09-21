@@ -37,19 +37,45 @@ class ActiveRecord
 
 	public static function getMany($aConditionBinds)
 	{
-		$sObject = get_called_class();
-
 		$sSql = 'SELECT `' . join('`,`', self::getDef('aField')) . '`
-			FROM `' . self::getDef('sTable') . '`
+			FROM %table%
 			WHERE `' . join('` = ? AND `', array_keys($aConditionBinds)) . '` = ?';
 
+		return self::getManyBySql($sSql, array_values($aConditionBinds));
+	}
+
+	public static function getManyBySql($sSql, $aParams = null)
+	{
+		$sObject = get_called_class();
+
+		//Keywords
+		$sSql = str_replace(
+			array(
+				'%table%',
+				'%id%'
+			),
+			array(
+				'`' . self::getDef('sTable') . '`',
+				'`' . self::getDef('sIdField') . '`'
+			),
+			$sSql
+		);
+
 		$oStmt = self::$oPdo->prepare($sSql);
-		$oStmt->execute(array_values($aConditionBinds));
+		$oStmt->execute($aParams);
 
 		$aResult = array();
 		while($aData = $oStmt->fetch(\PDO::FETCH_ASSOC))
 		{
-			$aResult[] = self::getObject($sObject, $aData[self::getDef('sIdField')], $aData);
+			//If we have missing fields, we can not prefill object
+			if(count(array_diff(self::getDef('aField'), array_keys($aData))) > 0)
+			{
+				$aResult[] = self::getObject($sObject, $aData[self::getDef('sIdField')]);
+			}
+			else
+			{
+				$aResult[] = self::getObject($sObject, $aData[self::getDef('sIdField')], $aData);
+			}
 		}
 
 		return $aResult;
