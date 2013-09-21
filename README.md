@@ -10,6 +10,8 @@ Let's put some rules down:
 * Definitions of objects must be defined only once (No definition description on __construct()!)
 * Definitions should be written in native PHP code for speed, should be possible to generate automatically at will.
 * Caching needs to be implemented: If i get object in one place of code and then object in other place of code, those objects must be same instances, if their ID is same.
+* Only necessary methods are provided as protected and public. (No bloat when you write _your_ software)
+* It must be super simple to plug it in to any project.
 
 Also, code must be strict but also leave you as much freedom as possible. Strict and freedom are not opposite words!
 
@@ -79,7 +81,7 @@ class User extends \AR\ActiveRecord
 So what is this model capable of?
 First it contains definition of the active record. Quite simple, probably doesn't need any more explanation. But then it gets interesting.
 
-It uses triggers to keep firstname ans surname field value in proper format, that is every name starts with capital letter and the rest is lowercased. It is done in postGet triggers (to get proper values from DB) and preSet triggers. (So proper names are going in to the DB)
+It uses triggers to keep firstname and surname field value in proper format, that is every name starts with capital letter and the rest is lowercased. It is done in postGet triggers (to get proper values from DB) and preSet triggers. (So proper names are going in to the DB)
 It also uses preSave trigger to prevent saving, if saved e-mail does not include '@' character.
 
 So...

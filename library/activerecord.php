@@ -19,22 +19,40 @@ class ActiveRecord
 	private $aData = array();
 	private $aNewData = array();
 
-	public static function setPdo($oPdo)
+	/**
+	 * @param \PDO $oPdo
+	 */
+	public static function setPdo(\PDO $oPdo)
 	{
 		self::$oPdo = $oPdo;
 	}
 
+	/**
+	 * @param string $sId
+	 *
+	 * @return ActiveRecord|false
+	 */
 	public static function getById($sId)
 	{
 		return self::getOne(array(self::getDef('sIdField') => $sId));
 	}
 
+	/**
+	 * @param array $aConditionBinds Key: field name, Value: field value
+	 *
+	 * @return ActiveRecord|false
+	 */
 	public static function getOne($aConditionBinds)
 	{
 		$aResult = self::getMany($aConditionBinds);
 		return reset($aResult);
 	}
 
+	/**
+	 * @param array $aConditionBinds Key: field name, Value: field value
+	 *
+	 * @return array|ActiveRecord[] Empty result is empty array
+	 */
 	public static function getMany($aConditionBinds)
 	{
 		$sSql = 'SELECT `' . join('`,`', self::getDef('aField')) . '`
@@ -44,6 +62,17 @@ class ActiveRecord
 		return self::getManyBySql($sSql, array_values($aConditionBinds));
 	}
 
+	/**
+	 * Performs SQL to provide ActiveRecord instances.
+	 * Can replace keywords:
+	 * 	%table% - ActiveRecord's table name
+	 * 	%id% - ActiveRecord's id field name
+	 *
+	 * @param $sSql
+	 * @param null|array $aParams
+	 *
+	 * @return array|ActiveRecord[] Empty result is empty array
+	 */
 	public static function getManyBySql($sSql, $aParams = null)
 	{
 		$sObject = get_called_class();
@@ -81,6 +110,13 @@ class ActiveRecord
 		return $aResult;
 	}
 
+	/**
+	 * Return definition(key)
+	 *
+	 * @param string $sKey
+	 *
+	 * @return array|string
+	 */
 	protected static function getDef($sKey = null)
 	{
 		if($sKey === null)
@@ -91,7 +127,16 @@ class ActiveRecord
 		return static::$aDefinition[$sKey];
 	}
 
-	private static function getObject($sObject, $sId, $aData = array())
+	/**
+	 * Get object from cache. If needed, create one. If possible, prefill with data.
+	 *
+	 * @param string $sObject Class name
+	 * @param string $sId
+	 * @param array $aPrefill Optional, if given, prefill is done
+	 *
+	 * @return ActiveRecord
+	 */
+	private static function getObject($sObject, $sId, $aPrefill = array())
 	{
 		if(!array_key_exists($sObject, self::$aCache))
 		{
@@ -105,14 +150,20 @@ class ActiveRecord
 
 		$oObject = self::$aCache[$sObject][$sId];
 
-		if(count($aData))
+		if(count($aPrefill))
 		{
-			$oObject->loadFromArray($aData);
+			$oObject->loadFromArray($aPrefill);
 		}
 
 		return self::$aCache[$sObject][$sId];
 	}
 
+	/**
+	 * Create new instance of ActiveRecord.
+	 *
+	 * @param null|string $sId If given, it will be treated as existing row
+	 * @param array $aData If given, prefill is done.
+	 */
 	public function __construct($sId = null, $aData = array())
 	{
 		$this->aData[self::getDef('sIdField')] = $sId;
@@ -123,11 +174,29 @@ class ActiveRecord
 		}
 	}
 
+	/**
+	 * @param string $sKey
+	 *
+	 * @return bool
+	 */
 	public function __isset($sKey)
 	{
 		return in_array($sKey, self::getDef('aField'));
 	}
 
+	/**
+	 * Getter for ActiveRecord properties.
+	 *
+	 * Will trigger:
+	 * 	_preGet()
+	 * 	_preGet_field_name()
+	 * 	_postGet_field_name()
+	 * 	_postGet()
+	 *
+	 * @param string $sKey
+	 *
+	 * @return mixed
+	 */
 	public function __get($sKey)
 	{
 		if(!$this->__isset($sKey))
@@ -177,6 +246,21 @@ class ActiveRecord
 		return $mValue;
 	}
 
+	/**
+	 * Sets a value to ActiveRecord.
+	 * If new value is same as old value (in DB), it is not registered to be saved to DB.
+	 *
+	 * Will trigger:
+	 * 	_preSet()
+	 * 	_preSet_field_name()
+	 * 	_postSet_field_name()
+	 * 	_postSet()
+	 *
+	 * @param string $sKey
+	 * @param mixed $mValue
+	 *
+	 * @return mixed Value that has been assigned
+	 */
 	public function __set($sKey, $mValue)
 	{
 		//_pre events
@@ -214,21 +298,41 @@ class ActiveRecord
 		return $mValue;
 	}
 
+	/**
+	 * @return string ID value of ActiveRecord
+	 */
 	public function getId()
 	{
 		return $this->aData[self::getDef('sIdField')];
 	}
 
+	/**
+	 * @return bool
+	 */
 	public function getIsInDb()
 	{
 		return $this->getId() !== null;
 	}
 
+	/**
+	 * Sets object in not loaded state. When something is accessed, lazy-load will load object's content.
+	 */
 	public function setNotLoaded()
 	{
 		$this->bLoaded = false;
 	}
 
+	/**
+	 * Saves or creates row in DB.
+	 *
+	 * Save will trigger events:
+	 * 	_preSave()
+	 * 	_preSave_field_name()
+	 * 	_postSave_field_name()
+	 * 	_postSave()
+	 *
+	 * @return bool Was saving successful
+	 */
 	public function save()
 	{
 		//_pre events
@@ -304,6 +408,16 @@ class ActiveRecord
 		return true;
 	}
 
+	/**
+	 * Deletes object from DB.
+	 * Object will stay, in php, you can not destroy yourself.
+	 *
+	 * Will trigger events:
+	 * 	_preDelete()
+	 * 	_postDelete()
+	 *
+	 * @return bool
+	 */
 	public function delete()
 	{
 		if(!$this->getIsInDb())
@@ -333,6 +447,11 @@ class ActiveRecord
 		return true;
 	}
 
+	/**
+	 * Loads ActiveRecord's content from DB.
+	 *
+	 * @return bool
+	 */
 	private function load()
 	{
 		if($this->bLoaded)
@@ -348,11 +467,20 @@ class ActiveRecord
 		$oStmt = self::$oPdo->prepare($sSql);
 		$oStmt->execute(array($this->getId()));
 
-		$this->loadFromArray($oStmt->fetch(\PDO::FETCH_ASSOC));
+		return $this->loadFromArray($oStmt->fetch(\PDO::FETCH_ASSOC));
 	}
 
+	/**
+	 * Fills ActiveRecord with data and sets ActiveRecord as loaded.
+	 *
+	 * @param array $aData
+	 *
+	 * @return bool
+	 */
 	private function loadFromArray($aData)
 	{
+		$this->bLoaded = false;
+
 		$aMissingFields = array_diff(self::getDef('aField'), array_keys($aData));
 
 		if(count($aMissingFields))
@@ -363,5 +491,7 @@ class ActiveRecord
 		$this->aData = array_intersect_key($aData, array_flip(self::getDef('aField')));
 
 		$this->bLoaded = true;
+
+		return true;
 	}
 }
