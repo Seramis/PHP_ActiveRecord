@@ -72,19 +72,21 @@ Triggers
 
 ActiveRecord has ability to execute different triggers. Triggers are (in order):
 Get
-___
+---
 * _preGet(field_name)
 * _preGet_field_name()
 * _postGet_field_name(field_value)
 * _postGet(field_name, field_value)
+
 Set
-___
+---
 * _preSet(field_name, field_value)
 * _preSet_field_name(field_value)
 * _postSet_field_name(field_value)
 * _postSet(field_name, field_value)
+
 Save
-____
+---
 * _preSave(field_value_array)
 * _preSave_field_name(field_value)
 * _postSave_field_name(field_value)
