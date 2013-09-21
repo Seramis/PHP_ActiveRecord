@@ -18,9 +18,11 @@ Usage
 =====
 
 Let's create one really nice User model:
-	<?php
-	class User extends \AR\ActiveRecord
-	{
-	}
+```php
+<?php
+class User extends \AR\ActiveRecord
+{
+}
+```
 
 And now, let's play with it.
