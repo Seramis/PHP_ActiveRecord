@@ -60,6 +60,19 @@ class User extends \AR\ActiveRecord
 			return false;
 		}
 	}
+
+	protected function _preDelete()
+	{
+		if($this->firstname != 'Foo Bar')
+		{
+			return false;
+		}
+	}
+
+	protected function _postDelete()
+	{
+		echo "Good bye!";
+	}
 }
 ```
 
