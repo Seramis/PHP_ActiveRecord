@@ -8,7 +8,7 @@ Let's put some rules down:
 * AR is not supposed to do business logic validation
 * Logic must work the same way with created or yet to be created objects
 * Definitions of objects must be defined only once (No definition description on __construct()!)
-* Definitions should be written in native PHP code for speed, should be possible to generate automaticall at will.
+* Definitions should be written in native PHP code for speed, should be possible to generate automatically at will.
 * Caching needs to be implemented: If i get object in one place of code and then object in other place of code, those objects must be same instances, if their ID is same.
 
 Also, code must be strict but also leave you as much freedom as possible. Strict and freedom are not opposite words!
@@ -164,3 +164,8 @@ echo $oUser->firstname;
 $oUser->delete();
 //DELETE FROM `user` WHERE `user_id` = 1
 ```
+
+What about data validators?
+===============
+ActiveRecord is row in DB. DB row doesn't know, how to validate data. It knows, how to hold data. So, data validation is not a job to be done by ActiveRecord.
+If you want to add validator, it's easy: you get your favorite data validator and attach it to triggers ActiveRecord provides. No chemistry, everything is plain simple!
