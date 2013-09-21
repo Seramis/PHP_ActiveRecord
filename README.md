@@ -196,7 +196,7 @@ $oUser->delete() == true;
 //Trigger _postDelete() will echo 'Good bye!'
 ```
 
-N+1 problem?
+N+1 SELECT problem?
 ============
 We have a solution for that too! Check that out:
 ```php
