@@ -526,7 +526,7 @@ class ActiveRecord
 
 		$aData = self::pdoFetchAllNested($oStmt);
 
-		return $this->loadFromArray($aData[self::getDef('sTable')]);
+		return $this->loadFromArray($aData[0][self::getDef('sTable')]);
 	}
 
 	/**
