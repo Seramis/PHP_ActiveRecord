@@ -67,6 +67,7 @@ So what is this model capable of?
 First it contains definition of the active record. Quite simple, probably doesn't need any more explanation. But then it gets interesting.
 
 It uses triggers to keep firstname ans surname field value in proper format, that is every name starts with capital letter and the rest is lowercased. It is done in postGet triggers (to get proper values from DB) and preSet triggers. (So proper names are going in to the DB)
+It also uses preSave trigger to prevent saving, if saved e-mail does not include '@' character.
 
 So...
 
@@ -126,6 +127,9 @@ Save
 Let's play!
 ===========
 ```php
+\AR\ActiveRecord::setPdo(new PDO('mysql:host=localhost;dbname=db_name;charset=utf8', 'username', 'password'));
+//Set up connection for ActiveRecord to use
+
 $oUser = new User();
 
 $oUser->firstname = 'john';
@@ -155,4 +159,7 @@ $oUser->save() == true;
 echo $oUser->firstname;
 //Lazy-load does loading if needed
 //Trigger _postGet_firstname() makes this value to 'Foo Bar' (even, if it is 'foo bar' in DB)
+
+$oUser->delete();
+//DELETE FROM user WHERE user_id = 1
 ```
