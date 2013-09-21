@@ -5,12 +5,14 @@ For some time, i have had many toughts how things should be different, when usin
 
 Let's put some rules down:
 * All properties represent only fields in DB
+* All method really do exist, nothing is generated on the fly (How should i know, what kind of methods there are? I want my IDE to show me all options!)
 * AR is not supposed to do business logic validation
 * Logic must work the same way with created or yet to be created objects
-* Definitions of objects must be defined only once (No definition description on __construct()!)
+* Definitions of objects must be defined only once (No definition description in __construct()!)
 * Definitions should be written in native PHP code for speed, should be possible to generate automatically at will.
 * Caching needs to be implemented: If i get object in one place of code and then object in other place of code, those objects must be same instances, if their ID is same.
 * Only necessary methods are provided as protected and public. (No bloat when you write _your_ software)
+* You should **not** learn new query language as you probably already know SQL
 * It must be super simple to plug it in to any project.
 
 Also, code must be strict but also leave you as much freedom as possible. Strict and freedom are not opposite words!
