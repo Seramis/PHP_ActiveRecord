@@ -11,7 +11,7 @@ abstract class ActiveRecord
 	);
 
 	/** @var array[] */
-	private static $aCache = array();
+	public static $aCache = array();
 	/** @var \PDO */
 	private static $oPdo = null;
 
@@ -58,7 +58,7 @@ abstract class ActiveRecord
 	public static function getMany($aConditionBinds)
 	{
 		$sSql = 'SELECT `' . join('`,`', self::getDef('aField')) . '`
-			FROM %table%
+			FROM %self.table%
 			WHERE `' . join('` = ? AND `', array_keys($aConditionBinds)) . '` = ?';
 
 		return self::getManyBySql($sSql, array_values($aConditionBinds));
@@ -67,31 +67,21 @@ abstract class ActiveRecord
 	/**
 	 * Performs SQL to provide ActiveRecord instances.
 	 * Can replace keywords:
-	 *    %table% - ActiveRecord's table name
-	 *    %id% - ActiveRecord's id field name
+	 *    %Model.table% - ActiveRecord's table name
+	 *    %Model.id% - ActiveRecord's id field name
+	 * Model should be replaced with model name or with 'self'
 	 *
 	 * @param string $sSql
 	 * @param null|array $aParams
-	 * @param array $aMap Mapping for preloading other object when using joins. table_name => Object_Name
 	 *
 	 * @return array|ActiveRecord[] Empty result is empty array
 	 */
-	public static function getManyBySql($sSql, $aParams = null, $aMap = array())
+	public static function getManyBySql($sSql, $aParams = null)
 	{
 		$sObject = get_called_class();
 
-		//Keywords
-		$sSql = str_replace(
-			array(
-				'%table%',
-				'%id%'
-			),
-			array(
-				'`' . self::getDef('sTable') . '`',
-				'`' . self::getDef('sIdField') . '`'
-			),
-			$sSql
-		);
+		//Parses sql and gives us map too
+		$aMap = self::parseQueryString($sSql);
 
 		$oStmt = self::$oPdo->prepare($sSql);
 		$oStmt->execute($aParams);
@@ -114,9 +104,10 @@ abstract class ActiveRecord
 				else
 				{
 					//If we have mapping for that table, cache that object
-					if(in_array($sTable, array_keys($aMap)))
+					$sSideObject = array_search($sTable, $aMap);
+					if($sSideObject)
 					{
-						self::getObject($aMap[$sTable], $aData);
+						self::getObject($sSideObject, $aData);
 					}
 				}
 			}
@@ -181,6 +172,56 @@ abstract class ActiveRecord
 
         return $oObject;
     }
+
+	/**
+	 * Query parser that parses argument and returns map of additional ActiveRecords found.
+	 *
+	 * @param string $sSql This parameter will be changed
+	 *
+	 * @return array Mapping; Class_Name => table_name
+	 */
+	private static function parseQueryString(&$sSql)
+	{
+		$sSelf = get_called_class();
+		$aMap = array();
+
+		//Match all placeholders like: %blah.blah%
+		while(preg_match('#\%([A-Za-z]*?)\.([A-Za-z]*?)\%#', $sSql, $aMatches))
+		{
+			$sObject = $aMatches[1];
+			if($sObject == 'self')
+			{
+				$sObject = $sSelf;
+			}
+
+			if(!class_exists($sObject))
+			{
+				trigger_error('Unable to find model "' . $sObject . '" while parsing query! Query: ' . $sSql, E_USER_ERROR);
+			}
+
+			//We don't need to add ourselves to map and also we dont need to put same thing in map multiple times
+			if($sObject != $sSelf && !array_key_exists($sObject, $aMap))
+			{
+				$aMap[$sObject] = $sObject::getDef('sTable');
+			}
+
+			switch($aMatches[2])
+			{
+				case 'id':
+					$sValue = '`' . $sObject::getDef('sIdField') . '`';
+					break;
+				case 'table':
+					$sValue = '`' . $sObject::getDef('sTable') . '`';
+					break;
+				default:
+					trigger_error('Unable to parse placeholder "' . $aMatches[0] . '"! Query: ' . $sSql, E_USER_ERROR);
+			}
+
+			$sSql = str_replace($aMatches[0], $sValue, $sSql);
+		}
+
+		return $aMap;
+	}
 
 	/**
 	 * Returns nested array in a form:

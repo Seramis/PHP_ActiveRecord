@@ -1,5 +1,4 @@
-# PHP_ActiveRecord #
-
+# PHP ActiveRecord #
 For some time, i have had many toughts how things should be different, when using or building different ActiveRecords or ORMs. Now it's time to put those toughts into code and show it to the public.
 
 Let's put some rules down:
@@ -19,7 +18,6 @@ Also, code must be strict but also leave you as much freedom as possible. Strict
 So by thinking about those rules, here is something, i have done.
 
 ## Usage ##
-
 Let's create one really nice User model:
 ```php
 class User extends \AR\ActiveRecord
@@ -87,8 +85,8 @@ It also uses preSave trigger to prevent saving, if saved e-mail does not include
 So...
 
 ## Triggers ##
-
 ActiveRecord has ability to execute different triggers. Triggers are (in order):
+
 ### Get ###
 * _preGet(field_name)
 	* Before lazy load
@@ -166,9 +164,9 @@ $oUser->mail = 'john@doe.com';
 $oUser->save() == true;
 //INSERT INTO user (`firstname`,`surname`,`mail`) VALUES ('John', 'Doe', 'john@doe.com')
 
-$aUser = User::getManyBySql('SELECT %id% FROM %table% WHERE %id% = ?', array($oUser->getId()));
-//Get list of users by sql. As I don't have to know, what table name is for user, I can use %table% keyword. Same goes for id field name.
-//If we use *, ActiveRecord will find that all fields are present and will prefill object
+$aUser = User::getManyBySql('SELECT %self.id% FROM %self.table% WHERE %self.id% = ?', array($oUser->getId()));
+//Get list of users by sql. As I don't have to know, what table name or id field is for user, I can use %self.table% and %self.id% keywords.
+//If we would use *, ActiveRecord would find that all fields are present and would prefill object.
 
 $oUser === $aUser[0]; //They really are equal thanks to cache
 
@@ -194,9 +192,7 @@ $oUser->delete() == true;
 We have a solution for that too! Check that out:
 ```php
 $aPost = Post::getManyBySql(
-	"SELECT %table%.*, user.* FROM %table% INNER JOIN user ON %table%.user_id = user.user_id",
-	null,
-	array('user' => 'User')
+	"SELECT %self.table%.*, %User.table%.* FROM %self.table% INNER JOIN %User.table% ON %self.table%.%User.id% = %User.table%.%User.id%"
 );
 
 foreach($aPost as $oPost)
@@ -205,9 +201,19 @@ foreach($aPost as $oPost)
 }
 ```
 **What happened?**
-As we selected data from multiple tables and we provided mapping info that user table is defining User model, ActiveRecord was able to cache all User objects what were needed. Now when we loop through posts and ask for User model with getById() method, object is returned from cache.
+As we selected data from multiple tables, ActiveRecord was able to cache all User objects what were found. (while also parsing keywords) Now when we loop through posts and ask for User model with getById() method, object is returned from cache.
 
-It supports all kinds of joins and even union. So if you know, that querying out something in extra will benefit performance very well, you can (if you really want) make a union sql and ActiveRecord will cache all objects, you say it has to. Can it get any better?
+It supports all kinds of joins. It's basic SQL. So if you know, that querying out something in extra will benefit performance very well, you can do that, and ActiveRecord will cache all objects. Can it get any better?
+
+But another interesting thing is shown here. `%placeholders%`
+
+## Placeholders ##
+Placeholders can be used in sql to refer to model's properties like table name or id field name. The format is `%Model.property%`.
+Properties can be `table` and `id`, which represent table name and id field name accordingly.
+
+So when we are asking for posts, we can refer to post table like `%self.table%` or `%Post.table%`. `self` is a special keyword that is translated to Model, you are asking.
+
+**Remember that the first part is model name, not table name.** You don't have to know any table's name or write them into sql.
 
 ## What about data validators? ##
 ActiveRecord is row in DB. DB row doesn't know, how to validate data. It knows, how to hold data. So, data validation is not a job to be done by ActiveRecord.
