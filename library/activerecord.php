@@ -11,7 +11,7 @@ abstract class ActiveRecord
 	);
 
 	/** @var array[] */
-	public static $aCache = array();
+	private static $aCache = array();
 	/** @var \PDO */
 	private static $oPdo = null;
 
