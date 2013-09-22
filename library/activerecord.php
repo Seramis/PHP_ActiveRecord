@@ -186,7 +186,7 @@ abstract class ActiveRecord
 		$aMap = array();
 
 		//Match all placeholders like: %blah.blah%
-		while(preg_match('#\%([A-Za-z]*?)\.([A-Za-z]*?)\%#', $sSql, $aMatches))
+		while(preg_match('#\%([A-Za-z_]*?)\.([A-Za-z]*?)\%#', $sSql, $aMatches))
 		{
 			$sObject = $aMatches[1];
 			if($sObject == 'self')
