@@ -166,7 +166,8 @@ abstract class ActiveRecord
 
         if(!array_key_exists($sId, self::$aCache[$sObject]))
         {
-            self::$aCache[$sObject][$sId] = new $sObject($sId);
+            self::$aCache[$sObject][$sId] = new $sObject();
+			self::$aCache[$sObject][$sId]->init($sId);
         }
 
 		/** @var ActiveRecord $oObject */
@@ -217,19 +218,11 @@ abstract class ActiveRecord
 	}
 
 	/**
-	 * Create new instance of ActiveRecord.
-	 *
-	 * @param null|string $sId If given, it will be treated as existing row
-	 * @param array $aData If given, prefill is done.
+	 * Create new ActiveRecord.
 	 */
-	public function __construct($sId = null, $aData = array())
+	public function __construct()
 	{
-		$this->aData[self::getDef('sIdField')] = $sId;
-
-		if(count($aData))
-		{
-			$this->loadFromArray($aData);
-		}
+		$this->aData[self::getDef('sIdField')] = null;
 	}
 
 	/**
@@ -505,6 +498,16 @@ abstract class ActiveRecord
 		$this->setNotLoaded();
 
 		return true;
+	}
+
+	/**
+	 * Private method to initiate existing rows as ActiveRecords
+	 *
+	 * @param mixed $sId
+	 */
+	private function init($sId = null)
+	{
+		$this->aData[self::getDef('sIdField')] = $sId;
 	}
 
 	/**
