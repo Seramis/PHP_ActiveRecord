@@ -2,7 +2,7 @@
 
 namespace AR;
 
-class ActiveRecord
+abstract class ActiveRecord
 {
 	protected static $aDefinition = array(
 		'sTable' => null,

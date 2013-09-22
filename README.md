@@ -216,6 +216,8 @@ foreach($aPost as $oPost)
 **What happened?**
 As we selected data from multiple tables and we provided mapping info that user table is defining User model, ActiveRecord was able to cache all User objects what were needed. Now when we loop through posts and ask for User model with getById() method, object is returned from cache.
 
+It supports all kinds of joins and even union. So if you know, that querying out something in extra will benefit performance very well, you can (if you really want) make a union sql and ActiveRecord will cache all objects, you say it has to. Can it get any better?
+
 What about data validators?
 ===========================
 ActiveRecord is row in DB. DB row doesn't know, how to validate data. It knows, how to hold data. So, data validation is not a job to be done by ActiveRecord.
