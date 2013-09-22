@@ -1,5 +1,4 @@
-PHP_ActiveRecord
-================
+# PHP_ActiveRecord #
 
 For some time, i have had many toughts how things should be different, when using or building different ActiveRecords or ORMs. Now it's time to put those toughts into code and show it to the public.
 
@@ -19,8 +18,7 @@ Also, code must be strict but also leave you as much freedom as possible. Strict
 
 So by thinking about those rules, here is something, i have done.
 
-Usage
-=====
+## Usage ##
 
 Let's create one really nice User model:
 ```php
@@ -88,12 +86,10 @@ It also uses preSave trigger to prevent saving, if saved e-mail does not include
 
 So...
 
-Triggers
-========
+## Triggers ##
 
 ActiveRecord has ability to execute different triggers. Triggers are (in order):
-Get
----
+### Get ###
 * _preGet(field_name)
 	* Before lazy load
 	* Values are not available yet (if not loaded previously)
@@ -111,8 +107,7 @@ Get
 	* Field value is now available
 	* Value can be modified
 
-Set
----
+### Set ###
 * _preSet(field_name, &field_value)
 	* Before set
 	* Can modify value
@@ -126,8 +121,7 @@ Set
 * _postSet(field_name, field_value)
 	* After set
 
-Save
----
+### Save ###
 * _preSave(&field_value_array)
 	* Before saving
 	* Can modify array of fields
@@ -141,8 +135,7 @@ Save
 * _postSave(field_value_array)
 	* After saving
 
-Delete
-------
+### Delete ###
 * _preDelete()
 	* Before delete
 	* All object data still usable
@@ -152,8 +145,7 @@ Delete
 	* Object is removed from cache
 	* Object data is still available to use here
 
-Let's play!
-===========
+## Let's play! ##
 ```php
 \AR\ActiveRecord::setPdo(new PDO('mysql:host=localhost;dbname=db_name;charset=utf8', 'username', 'password'));
 //Set up connection for ActiveRecord to use
@@ -198,8 +190,7 @@ $oUser->delete() == true;
 //Trigger _postDelete() will echo 'Good bye!'
 ```
 
-N+1 SELECT problem?
-============
+## N+1 SELECT problem? ##
 We have a solution for that too! Check that out:
 ```php
 $aPost = Post::getManyBySql(
@@ -218,13 +209,11 @@ As we selected data from multiple tables and we provided mapping info that user 
 
 It supports all kinds of joins and even union. So if you know, that querying out something in extra will benefit performance very well, you can (if you really want) make a union sql and ActiveRecord will cache all objects, you say it has to. Can it get any better?
 
-What about data validators?
-===========================
+## What about data validators? ##
 ActiveRecord is row in DB. DB row doesn't know, how to validate data. It knows, how to hold data. So, data validation is not a job to be done by ActiveRecord.
 If you want to add validator, it's easy: you get your favorite data validator and attach it to triggers ActiveRecord provides. No chemistry, everything is plain simple!
 
-Licence
-=======
+## Licence ##
 The MIT License (MIT)
 
 Copyright (c) 2013 Joonatan Uusväli
