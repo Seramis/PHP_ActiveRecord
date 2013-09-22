@@ -169,15 +169,16 @@ abstract class ActiveRecord
             self::$aCache[$sObject][$sId] = new $sObject($sId);
         }
 
+		/** @var ActiveRecord $oObject */
         $oObject = self::$aCache[$sObject][$sId];
 
-		//If we have all fields, we can preload object
-        if(count(array_diff($sObject::getDef('aField'), array_keys($aDataArray))) == 0)
+		//If object is not loaded and we have all fields, we can preload object
+        if(!$oObject->bLoaded && count(array_diff($sObject::getDef('aField'), array_keys($aDataArray))) == 0)
         {
             $oObject->loadFromArray($aDataArray);
         }
 
-        return self::$aCache[$sObject][$sId];
+        return $oObject;
     }
 
 	/**
@@ -408,7 +409,8 @@ abstract class ActiveRecord
 			}
 		}
 
-		if($this->getId() === null){
+		if($this->getId() === null)
+		{
 			$sSql = 'INSERT INTO `' . self::getDef('sTable') . '`
 			 	(`' . join('`,`', array_keys($this->aNewData)) . '`)
 				VALUES
@@ -429,7 +431,8 @@ abstract class ActiveRecord
 
 			self::$aCache[$sObject][$this->getId()] = $this;
 		}
-		else{
+		else
+		{
 			$sSql = 'UPDATE `' . self::getDef('sTable') . '` SET ';
 			foreach(array_keys($this->aNewData) as $sField)
 			{
@@ -538,7 +541,7 @@ abstract class ActiveRecord
 	 */
 	private function loadFromArray($aData)
 	{
-		$this->bLoaded = false;
+		$this->setNotLoaded();
 
 		$aMissingFields = array_diff(self::getDef('aField'), array_keys($aData));
 
