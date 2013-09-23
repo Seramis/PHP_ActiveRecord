@@ -355,6 +355,11 @@ abstract class ActiveRecord
 	 */
 	public function __set($sKey, $mValue)
 	{
+		if($sKey == self::getDef('sIdField'))
+		{
+			trigger_error('You can not set id!', E_USER_ERROR);
+		}
+
 		//_pre events
 		if(method_exists($this, '_preSet'))
 		{
