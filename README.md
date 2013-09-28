@@ -1,5 +1,5 @@
 # PHP ActiveRecord #
-For some time, i have had many toughts how things should be different, when using or building different ActiveRecords or ORMs. Now it's time to put those toughts into code and show it to the public.
+For some time, i have had many thoughts how things should be different, when using or building different ActiveRecords or ORMs. Now it's time to put those thoughts into code and show it to the public.
 
 Let's put some rules down:
 * All properties represent only fields in DB
@@ -91,11 +91,11 @@ ActiveRecord has ability to execute different triggers. Triggers are (in order):
 * _preGet(field_name)
 	* Before lazy load
 	* Values are not available yet (if not loaded previously)
-	* Can return false to so get is prevented and false is returned by ActiveRecord
+	* Can return false so get is prevented and false is returned by ActiveRecord
 * _preGet_field_name()
 	* Before lazy load
     * Values are not available yet (if not loaded previously)
-    * Can return false to so get is prevented and false is returned by ActiveRecord
+    * Can return false so get is prevented and false is returned by ActiveRecord
 * _postGet_field_name(&field_value)
 	* After lazyload
 	* Field value is now available

@@ -25,8 +25,6 @@ abstract class ActiveRecord
 	public static function setPdo(\PDO $oPdo)
 	{
 		self::$oPdo = $oPdo;
-
-		self::$oPdo->setAttribute(\PDO::ATTR_FETCH_TABLE_NAMES, true);
 	}
 
 	/**
@@ -89,9 +87,9 @@ abstract class ActiveRecord
 		$aResultSet = self::pdoFetchAllNested($oStmt);
 
 		$aResult = array();
-		foreach($aResultSet as $aRow)
+		foreach($aResultSet as $sTable => $aRowList)
 		{
-			foreach($aRow as $sTable => $aData)
+			foreach($aRowList as $aData)
 			{
 				if($sTable == self::getDef('sTable')) //It's our table
 				{
@@ -226,8 +224,8 @@ abstract class ActiveRecord
 	/**
 	 * Returns nested array in a form:
 	 * array(
-	 *  row_counter => array(
-	 * 	 table_name => array(
+	 *  table_name => array(
+	 * 	 row_counter => array(
 	 * 	  field_name=>field_value
 	 * 	 )
 	 * 	)
@@ -239,20 +237,27 @@ abstract class ActiveRecord
 	 */
 	private static function pdoFetchAllNested(\PDOStatement $oStmt)
 	{
-		$aResult = array();
-
-		while(($aRowData = $oStmt->fetch(\PDO::FETCH_ASSOC)) !== false)
+		//Get data about returned fields
+		$aTableField = array();
+		for($i = 0; $i < $oStmt->columnCount(); $i++)
 		{
-			$aRow = array();
+			$aMetaData = $oStmt->getColumnMeta($i);
+			$aTableField[] = array($aMetaData['table'], $aMetaData['name']);
+		}
 
-			foreach($aRowData as $sKey => $mValue)
+		//Parse all returned fields into a nice array
+		$aResult = array();
+		$iRowIndex = 0;
+		while(($aRow = $oStmt->fetch(\PDO::FETCH_NUM)) !== false)
+		{
+			foreach($aRow as $iKey => $mValue)
 			{
-				list($sTable, $sKey) = explode('.', $sKey);
+				$aFieldData = $aTableField[$iKey];
 
-				$aRow[$sTable][$sKey] = $mValue;
+				$aResult[$aFieldData[0]][$iRowIndex][$aFieldData[1]] = $mValue;
 			}
 
-			$aResult[] = $aRow;
+			$iRowIndex++;
 		}
 
 		return $aResult;
@@ -578,7 +583,7 @@ abstract class ActiveRecord
 
 		$aData = self::pdoFetchAllNested($oStmt);
 
-		return $this->loadFromArray($aData[0][self::getDef('sTable')]);
+		return $this->loadFromArray($aData[self::getDef('sTable')][0]);
 	}
 
 	/**
@@ -592,14 +597,17 @@ abstract class ActiveRecord
 	{
 		$this->setNotLoaded();
 
-		$aMissingFields = array_diff(self::getDef('aField'), array_keys($aData));
+		$aFieldsMandatory = self::getDef('aField');
+		unset($aFieldsMandatory[array_search(self::getDef('sIdField'), $aFieldsMandatory)]);
+
+		$aMissingFields = array_diff($aFieldsMandatory, array_keys($aData));
 
 		if(count($aMissingFields))
 		{
 			trigger_error('Loading array is missing fields: ' . join(', ', $aMissingFields) . '!', E_USER_ERROR);
 		}
 
-		$this->aData = array_intersect_key($aData, array_flip(self::getDef('aField')));
+		$this->aData = array_merge($this->aData, array_intersect_key($aData, array_flip($aFieldsMandatory)));
 
 		$this->bLoaded = true;
 
