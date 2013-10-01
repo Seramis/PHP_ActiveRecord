@@ -14,6 +14,7 @@ abstract class ActiveRecord
 	private static $aCache = array();
 	/** @var \PDO */
 	private static $oPdo = null;
+	private static $sNamespace = '';
 
 	private $bLoaded = false;
 	private $aData = array();
@@ -27,6 +28,11 @@ abstract class ActiveRecord
 		self::$oPdo = $oPdo;
 	}
 
+	public static function setActiveRecordNamespace($sNamespaceName)
+	{
+		self::$sNamespace = '\\' . $sNamespaceName . '\\';
+	}
+
 	/**
 	 * @param string $sId
 	 *
@@ -38,7 +44,7 @@ abstract class ActiveRecord
 	}
 
 	/**
-	 * @param array $aConditionBinds Key: field name, Value: field value
+	 * @param array $aConditionBinds array(array('condition', $value, $value), array('condition', $value, $value))
 	 *
 	 * @return ActiveRecord|false
 	 */
@@ -191,6 +197,10 @@ abstract class ActiveRecord
 			if($sObject == 'self')
 			{
 				$sObject = $sSelf;
+			}
+			else
+			{
+				$sObject = self::$sNamespace . $sObject;
 			}
 
 			if(!class_exists($sObject))
