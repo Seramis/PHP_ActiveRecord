@@ -45,6 +45,7 @@ abstract class ActiveRecord
 	public static function getOne($aConditionBinds)
 	{
 		$aResult = self::getMany($aConditionBinds);
+
 		return reset($aResult);
 	}
 
@@ -96,7 +97,7 @@ abstract class ActiveRecord
 					$oObject = self::getObject($sObject, $aData);
 					if(!in_array($oObject, $aResult))
 					{
-						$aResult[] = self::getObject($sObject, $aData);
+						$aResult[] = $oObject;
 					}
 				}
 				else
@@ -139,37 +140,37 @@ abstract class ActiveRecord
 	 *
 	 * @return ActiveRecord
 	 */
-    private static function getObject($sObject, $aDataArray)
-    {
-        $sId = $aDataArray[$sObject::getDef('sIdField')];
+	private static function getObject($sObject, $aDataArray)
+	{
+		$sId = $aDataArray[$sObject::getDef('sIdField')];
 
-        if(!$sId)
-        {
-            trigger_error('No id provided with data array!', E_USER_ERROR);
-        }
+		if(!$sId)
+		{
+			trigger_error('No id provided with data array!', E_USER_ERROR);
+		}
 
-        if(!array_key_exists($sObject, self::$aCache))
-        {
-            self::$aCache[$sObject] = array();
-        }
+		if(!array_key_exists($sObject, self::$aCache))
+		{
+			self::$aCache[$sObject] = array();
+		}
 
-        if(!array_key_exists($sId, self::$aCache[$sObject]))
-        {
-            self::$aCache[$sObject][$sId] = new $sObject();
+		if(!array_key_exists($sId, self::$aCache[$sObject]))
+		{
+			self::$aCache[$sObject][$sId] = new $sObject();
 			self::$aCache[$sObject][$sId]->init($sId);
-        }
+		}
 
 		/** @var ActiveRecord $oObject */
-        $oObject = self::$aCache[$sObject][$sId];
+		$oObject = self::$aCache[$sObject][$sId];
 
 		//If object is not loaded and we have all fields, we can preload object
-        if(!$oObject->bLoaded && count(array_diff($sObject::getDef('aField'), array_keys($aDataArray))) == 0)
-        {
-            $oObject->loadFromArray($aDataArray);
-        }
+		if(!$oObject->bLoaded && count(array_diff($sObject::getDef('aField'), array_keys($aDataArray))) == 0)
+		{
+			$oObject->loadFromArray($aDataArray);
+		}
 
-        return $oObject;
-    }
+		return $oObject;
+	}
 
 	/**
 	 * Query parser that parses argument and returns map of additional ActiveRecords found.
@@ -225,10 +226,10 @@ abstract class ActiveRecord
 	 * Returns nested array in a form:
 	 * array(
 	 *  table_name => array(
-	 * 	 row_counter => array(
-	 * 	  field_name=>field_value
-	 * 	 )
-	 * 	)
+	 *     row_counter => array(
+	 *      field_name=>field_value
+	 *     )
+	 *    )
 	 * )
 	 *
 	 * @param \PDOStatement $oStmt
@@ -285,10 +286,10 @@ abstract class ActiveRecord
 	 * Getter for ActiveRecord properties.
 	 *
 	 * Will trigger:
-	 * 	_preGet()
-	 * 	_preGet_field_name()
-	 * 	_postGet_field_name()
-	 * 	_postGet()
+	 *    _preGet()
+	 *    _preGet_field_name()
+	 *    _postGet_field_name()
+	 *    _postGet()
 	 *
 	 * @param string $sKey
 	 *
@@ -348,10 +349,10 @@ abstract class ActiveRecord
 	 * If new value is same as old value (in DB), it is not registered to be saved to DB.
 	 *
 	 * Will trigger:
-	 * 	_preSet()
-	 * 	_preSet_field_name()
-	 * 	_postSet_field_name()
-	 * 	_postSet()
+	 *    _preSet()
+	 *    _preSet_field_name()
+	 *    _postSet_field_name()
+	 *    _postSet()
 	 *
 	 * @param string $sKey
 	 * @param mixed $mValue
@@ -428,10 +429,10 @@ abstract class ActiveRecord
 	 * Saves or creates row in DB.
 	 *
 	 * Save will trigger events:
-	 * 	_preSave()
-	 * 	_preSave_field_name()
-	 * 	_postSave_field_name()
-	 * 	_postSave()
+	 *    _preSave()
+	 *    _preSave_field_name()
+	 *    _postSave_field_name()
+	 *    _postSave()
 	 *
 	 * @return bool Was saving successful
 	 */
@@ -517,8 +518,8 @@ abstract class ActiveRecord
 	 * Object will stay, in php, you can not destroy yourself.
 	 *
 	 * Will trigger events:
-	 * 	_preDelete()
-	 * 	_postDelete()
+	 *    _preDelete()
+	 *    _postDelete()
 	 *
 	 * @return bool
 	 */
