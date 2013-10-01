@@ -14,7 +14,6 @@ abstract class ActiveRecord
 	private static $aCache = array();
 	/** @var \PDO */
 	private static $oPdo = null;
-	private static $sNamespace = '';
 
 	private $bLoaded = false;
 	private $aData = array();
@@ -26,11 +25,6 @@ abstract class ActiveRecord
 	public static function setPdo(\PDO $oPdo)
 	{
 		self::$oPdo = $oPdo;
-	}
-
-	public static function setActiveRecordNamespace($sNamespaceName)
-	{
-		self::$sNamespace = '\\' . $sNamespaceName . '\\';
 	}
 
 	/**
@@ -188,6 +182,8 @@ abstract class ActiveRecord
 	private static function parseQueryString(&$sSql)
 	{
 		$sSelf = get_called_class();
+		$sNamespace = '\\' . substr($sSelf, 0, strrpos($sSelf, '\\') + 1);
+
 		$aMap = array();
 
 		//Match all placeholders like: %blah.blah%
@@ -200,7 +196,7 @@ abstract class ActiveRecord
 			}
 			else
 			{
-				$sObject = self::$sNamespace . $sObject;
+				$sObject = $sNamespace . $sObject;
 			}
 
 			if(!class_exists($sObject))
