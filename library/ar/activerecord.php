@@ -56,7 +56,7 @@ abstract class ActiveRecord
 	 */
 	public static function getMany($aConditionBinds)
 	{
-		$sSql = 'SELECT `' . join('`,`', self::getDef('aField')) . '`
+		$sSql = 'SELECT %self.table%.*
 			FROM %self.table%
 			WHERE `' . join('` = ? AND `', array_keys($aConditionBinds)) . '` = ?';
 
