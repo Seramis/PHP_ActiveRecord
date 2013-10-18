@@ -30,7 +30,7 @@ abstract class ActiveRecord
 	/**
 	 * @param string $sId
 	 *
-	 * @return ActiveRecord|false
+	 * @return ActiveRecord|bool False on no result
 	 */
 	public static function getById($sId)
 	{
@@ -40,7 +40,7 @@ abstract class ActiveRecord
 	/**
 	 * @param array $aConditionBinds array(array('condition', $value, $value), array('condition', $value, $value))
 	 *
-	 * @return ActiveRecord|false
+	 * @return ActiveRecord|bool False on no result
 	 */
 	public static function getOne($aConditionBinds)
 	{
@@ -149,12 +149,7 @@ abstract class ActiveRecord
 			trigger_error('No id provided with data array!', E_USER_ERROR);
 		}
 
-		if(!array_key_exists($sObject, self::$aCache))
-		{
-			self::$aCache[$sObject] = array();
-		}
-
-		if(!array_key_exists($sId, self::$aCache[$sObject]))
+		if(!isset(self::$aCache[$sObject][$sId]))
 		{
 			self::$aCache[$sObject][$sId] = new $sObject();
 			self::$aCache[$sObject][$sId]->init($sId);
@@ -205,7 +200,7 @@ abstract class ActiveRecord
 			}
 
 			//We don't need to add ourselves to map and also we dont need to put same thing in map multiple times
-			if($sObject != $sSelf && !array_key_exists($sObject, $aMap))
+			if($sObject != $sSelf && !isset($aMap[$sObject]))
 			{
 				$aMap[$sObject] = $sObject::getDef('sTable');
 			}
@@ -254,17 +249,15 @@ abstract class ActiveRecord
 
 		//Parse all returned fields into a nice array
 		$aResult = array();
-		$iRowIndex = 0;
-		while(($aRow = $oStmt->fetch(\PDO::FETCH_NUM)) !== false)
+		for($iRowIndex = 0; ($aRow = $oStmt->fetch(\PDO::FETCH_NUM)) !== false; $iRowIndex++)
 		{
 			foreach($aRow as $iKey => $mValue)
 			{
 				$aFieldData = $aTableField[$iKey];
 
+				//Table, row, field
 				$aResult[$aFieldData[0]][$iRowIndex][$aFieldData[1]] = $mValue;
 			}
-
-			$iRowIndex++;
 		}
 
 		return $aResult;
@@ -329,13 +322,23 @@ abstract class ActiveRecord
 			}
 		}
 
-		//If the key isn't id field, load object
-		if($this->getIsInDb() && $sKey != self::getDef('sIdField'))
+		//Getting the value
+		if($sKey == self::getDef('sIdField'))
 		{
-			$this->load();
+			$mValue = $this->getId();
 		}
-
-		$mValue = $this->getIsInDb() ? $this->aData[$sKey] : $this->aNewData[$sKey];
+		else
+		{
+			if($this->getIsInDb())
+			{
+				$this->load();
+				$mValue = $this->aData[$sKey];
+			}
+			else //If not in DB, return new value or NULL, when value is unset
+			{
+				$mValue = array_key_exists($sKey, $this->aNewData) ? $this->aNewData[$sKey] : null;
+			}
+		}
 
 		//_post events
 		if(method_exists($this, '_postGet_' . $sKey))
@@ -389,6 +392,8 @@ abstract class ActiveRecord
 		}
 
 		$this->aNewData[$sKey] = $mValue;
+
+		//If we are loaded and we can see, that new value is same as old one, no need to keep that value.
 		if($this->bLoaded && $this->aNewData[$sKey] == $this->aData[$sKey])
 		{
 			unset($this->aNewData[$sKey]);
@@ -475,11 +480,6 @@ abstract class ActiveRecord
 			//Insert object into cache
 			$sObject = get_called_class();
 
-			if(!array_key_exists($sObject, self::$aCache))
-			{
-				self::$aCache[$sObject] = array();
-			}
-
 			self::$aCache[$sObject][$this->getId()] = $this;
 		}
 		else
@@ -555,6 +555,8 @@ abstract class ActiveRecord
 
 		$this->setNotLoaded();
 
+		$this->aData[self::getDef('sIdField')] = null; //Reset ID, we are now not in DB
+
 		return true;
 	}
 
@@ -580,7 +582,7 @@ abstract class ActiveRecord
 			return false;
 		}
 
-		$sSql = 'SELECT `' . join('`,`', self::getDef('aField')) . '`
+		$sSql = 'SELECT *
 			FROM `' . self::getDef('sTable') . '`
 			WHERE `' . self::getDef('sIdField') . '` = ?
 			LIMIT 1;';
@@ -614,7 +616,10 @@ abstract class ActiveRecord
 			trigger_error('Loading array is missing fields: ' . join(', ', $aMissingFields) . '!', E_USER_ERROR);
 		}
 
-		$this->aData = array_merge($this->aData, array_intersect_key($aData, array_flip($aFieldsMandatory)));
+		$this->aData = array_merge(
+			$this->aData,
+			array_intersect_key($aData, array_flip($aFieldsMandatory))
+		);
 
 		$this->bLoaded = true;
 
