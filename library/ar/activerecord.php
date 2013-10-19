@@ -258,7 +258,7 @@ abstract class ActiveRecord
 		//If no value or 'self' keyword, it's this class
 		if($sCalledClass == null || $sCalledClass == 'self')
 		{
-			$sCalledClass = '\\' . get_called_class();
+			return '\\' . get_called_class();
 		}
 
 		//If there is no namespaces mentioned, use this class' namespace (if exists)
@@ -270,7 +270,7 @@ abstract class ActiveRecord
 			{
 				$sNamespace = $sNamespace . '\\';
 			}
-			$sCalledClass = '\\' . $sNamespace . $sCalledClass;
+			return '\\' . $sNamespace . $sCalledClass;
 		}
 
 		//If path is relative (no \ in beginning), append this class' namespace to the beginning (if exists)
@@ -282,10 +282,8 @@ abstract class ActiveRecord
 			{
 				$sNamespace = $sNamespace . '\\';
 			}
-			$sCalledClass = '\\' . $sNamespace . $sCalledClass;
+			return '\\' . $sNamespace . $sCalledClass;
 		}
-
-		return $sCalledClass;
 	}
 
 	/**
