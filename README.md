@@ -156,36 +156,65 @@ $oUser->firstname = 'john';
 $oUser->surname = 'doe';
 //Trigger _preSet_surname() modifies it to 'Doe'
 
-$oUser->save() == false;
+$oUser->save() === false;
 //Trigger _preSave_mail() prevents us to save ActiveRecord
 
 $oUser->mail = 'john@doe.com';
 
-$oUser->save() == true;
+$oUser->save() === true;
 //INSERT INTO user (`firstname`,`surname`,`mail`) VALUES ('John', 'Doe', 'john@doe.com')
 
-$aUser = User::getManyBySql('SELECT %self.id% FROM %self.table% WHERE %self.id% = ?', array($oUser->getId()));
-//Get list of users by sql. As I don't have to know, what table name or id field is for user, I can use %self.table% and %self.id% keywords.
-//If we would use *, ActiveRecord would find that all fields are present and would prefill object.
+$oUser->save() === null;
+//We have nothing to save anymore
 
-$oUser === $aUser[0]; //They really are equal thanks to cache
+/*
+ * Let's get that user in different ways
+ */
 
-$oUser->delete() == false;
+$oUserById = User::getById($oUser->getId());
+//Goes against cache, if it isn't in cache, uses self::getOne()
+
+$oUserOne = User::getOne(array('%self.id% = ?' => $oUser->getId()));
+//Calls self::getMany() internally and takes first element
+//As I don't have to know, what is the id field for User, I can use %self.id%.
+
+$aUserMany = User::getMany(array('%self.id% = ?' => $oUser->getId()));
+//Returns list of object by array of conditions where key is condition and value is NULL, one value or array of values
+
+$aUserWhere = User::getManyByWhere('%self.id% = ?', array($oUser->getId()));
+//Returns list of objects by self-written WHERE. Second argument is for parameters.
+
+$aUserSql = User::getManyBySql('SELECT %self.id% FROM %self.table% WHERE %self.id% = ?', array($oUser->getId()));
+//Get list of users by sql.
+//If we use *, ActiveRecord will find that all fields are present and will prefill object
+
+$oUser === $oUserById;
+$oUserById === $oUserOne;
+$oUserOne === $aUserMany[0];
+$aUserMany[0] === $aUserWhere[0];
+$aUserWhere[0] === $aUserSql[0];
+//They really are identical thanks to cache
+
+$oUser->delete() === false;
 //Trigger _preDelete() prevents delete command
 
 $oUser->firstname = 'foo bar';
 //Trigger _preSet_firstname() modifies it to 'Foo Bar'
 
-$oUser->save() == true;
+$oUser->save() === true;
 //UPDATE `user` SET `firstname` = 'Foo Bar' WHERE `user_id` = '1'
 
 echo $oUser->firstname;
 //Lazy-load does loading if needed
 //Trigger _postGet_firstname() makes this value to 'Foo Bar' (even, if it is 'foo bar' in DB)
 
-$oUser->delete() == true;
+$oUser->delete() === true;
 //DELETE FROM `user` WHERE `user_id` = 1
 //Trigger _postDelete() will echo 'Good bye!'
+
+$oUser->save();
+//And now, insert happens just like we would create new object.
+//INSERT INTO user (`firstname`,`surname`,`mail`) VALUES ('Foo Bar', 'Doe', 'john@doe.com')
 ```
 
 ## N+1 SELECT problem? ##
