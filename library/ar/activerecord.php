@@ -487,10 +487,16 @@ abstract class ActiveRecord
 	 *    _postSave_field_name()
 	 *    _postSave()
 	 *
-	 * @return bool Was saving successful
+	 * @return bool|null Was saving successful, NULL if nothing was saved
 	 */
 	public function save()
 	{
+		//If we don't have anything to save, return null
+		if(!count($this->aNewData))
+		{
+			return null;
+		}
+
 		//_pre events
 		if(method_exists($this, '_preSave'))
 		{
