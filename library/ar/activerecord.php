@@ -34,7 +34,12 @@ abstract class ActiveRecord
 	 */
 	public static function getById($sId)
 	{
-		return self::getOne(array(self::getDef('sIdField') => $sId));
+		$sObject = self::getClassName();
+
+		return self::getObject(
+			$sObject,
+			array(self::getDef('sIdField') => $sId)
+		);
 	}
 
 	/**
@@ -77,8 +82,6 @@ abstract class ActiveRecord
 	 */
 	public static function getManyBySql($sSql, $aParams = null)
 	{
-		$sObject = get_called_class();
-
 		//Parses sql and gives us map too
 		$aMap = self::parseQueryString($sSql);
 
@@ -92,22 +95,12 @@ abstract class ActiveRecord
 		{
 			foreach($aRowList as $aData)
 			{
-				if($sTable == self::getDef('sTable')) //It's our table
+				$oObject = self::getObject($aMap[$sTable], $aData);
+
+				//It's our table and we don't object in resultset yet
+				if($sTable == self::getDef('sTable') && !in_array($oObject, $aResult))
 				{
-					$oObject = self::getObject($sObject, $aData);
-					if(!in_array($oObject, $aResult))
-					{
-						$aResult[] = $oObject;
-					}
-				}
-				else
-				{
-					//If we have mapping for that table, cache that object
-					$sSideObject = array_search($sTable, $aMap);
-					if($sSideObject)
-					{
-						self::getObject($sSideObject, $aData);
-					}
+					$aResult[] = $oObject;
 				}
 			}
 		}
@@ -176,23 +169,12 @@ abstract class ActiveRecord
 	 */
 	private static function parseQueryString(&$sSql)
 	{
-		$sSelf = get_called_class();
-		$sNamespace = '\\' . substr($sSelf, 0, strrpos($sSelf, '\\') + 1);
-
 		$aMap = array();
 
 		//Match all placeholders like: %blah.blah%
-		while(preg_match('#\%([A-Za-z_]*?)\.([A-Za-z]*?)\%#', $sSql, $aMatches))
+		while(preg_match('#\%([A-Za-z_\\\\]*?)\.([A-Za-z]*?)\%#', $sSql, $aMatches))
 		{
-			$sObject = $aMatches[1];
-			if($sObject == 'self')
-			{
-				$sObject = $sSelf;
-			}
-			else
-			{
-				$sObject = $sNamespace . $sObject;
-			}
+			$sObject = self::getClassName($aMatches[1]);
 
 			if(!class_exists($sObject))
 			{
@@ -200,9 +182,9 @@ abstract class ActiveRecord
 			}
 
 			//We don't need to add ourselves to map and also we dont need to put same thing in map multiple times
-			if($sObject != $sSelf && !isset($aMap[$sObject]))
+			if(!isset($aMap[$sObject::getDef('sTable')]))
 			{
-				$aMap[$sObject] = $sObject::getDef('sTable');
+				$aMap[$sObject::getDef('sTable')] = $sObject;
 			}
 
 			switch($aMatches[2])
@@ -264,10 +246,52 @@ abstract class ActiveRecord
 	}
 
 	/**
-	 * Create new ActiveRecord.
+	 * Returns fully qualified name of model with same namespace
+	 * Implements keyword 'self'.
+	 *
+	 * @param null|string $sCalledClass
+	 *
+	 * @return string
 	 */
-	public function __construct()
+	private static function getClassName($sCalledClass = null)
 	{
+		$sSelf = get_called_class();
+		if($sCalledClass == null)
+		{
+			$sCalledClass = $sSelf;
+		}
+
+		$sClass = trim(substr($sCalledClass, strrpos($sCalledClass, '\\')), '\\');
+		if($sClass == 'self')
+		{
+			$sClass = trim(substr($sSelf, strrpos($sSelf, '\\')), '\\');
+		}
+
+		$sNamespace = '\\';
+		if(stristr($sSelf, '\\'))
+		{
+			$sNamespace .= substr($sSelf, 0, strrpos($sSelf, '\\') + 1);
+		}
+
+		return $sNamespace . $sClass;
+	}
+
+	/**
+	 * Create new ActiveRecord.
+	 *
+	 * @param array $aSetData Set array as new content for AR
+	 */
+	public function __construct($aSetData = array())
+	{
+		if(count($aSetData))
+		{
+			foreach($aSetData as $sName => $mValue)
+			{
+				$this->$sName = $mValue;
+			}
+		}
+
+		//It's new AR, there's no ID
 		$this->aData[self::getDef('sIdField')] = null;
 	}
 
@@ -437,6 +461,14 @@ abstract class ActiveRecord
 	}
 
 	/**
+	 * All new data, what is not saved, is truncated from object
+	 */
+	public function truncateNewData()
+	{
+		$this->aNewData = array();
+	}
+
+	/**
 	 * Saves or creates row in DB.
 	 *
 	 * Save will trigger events:
@@ -478,7 +510,7 @@ abstract class ActiveRecord
 			$this->aData[self::getDef('sIdField')] = self::$oPdo->lastInsertId();
 
 			//Insert object into cache
-			$sObject = get_called_class();
+			$sObject = self::getClassName();
 
 			self::$aCache[$sObject][$this->getId()] = $this;
 		}
@@ -545,7 +577,7 @@ abstract class ActiveRecord
 			->execute(array($this->getId()));
 
 		//Delete object from cache
-		$sObject = get_called_class();
+		$sObject = self::getClassName();
 		unset(self::$aCache[$sObject][$this->getId()]);
 
 		if(method_exists($this, '_postDelete'))
