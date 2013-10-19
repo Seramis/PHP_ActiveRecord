@@ -273,11 +273,16 @@ abstract class ActiveRecord
 			$sCalledClass = '\\' . $sNamespace . $sCalledClass;
 		}
 
-		//If path is relative (no \ in beginning), append this class' namespace to the beginning
+		//If path is relative (no \ in beginning), append this class' namespace to the beginning (if exists)
 		if($sCalledClass{0} != '\\')
 		{
 			$sSelfClass = get_called_class();
-			$sCalledClass = '\\' . trim(substr($sSelfClass, 0, strrpos($sSelfClass, '\\')), '\\') . '\\' . $sCalledClass;
+			$sNamespace = substr($sSelfClass, 0, strrpos($sSelfClass, '\\'));
+			if($sNamespace)
+			{
+				$sNamespace = $sNamespace . '\\';
+			}
+			$sCalledClass = '\\' . $sNamespace . $sCalledClass;
 		}
 
 		return $sCalledClass;
