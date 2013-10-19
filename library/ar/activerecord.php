@@ -36,36 +36,79 @@ abstract class ActiveRecord
 	{
 		$sObject = self::getClassName();
 
-		return self::getObject(
-			$sObject,
-			array(self::getDef('sIdField') => $sId)
-		);
+		if(isset(self::$aCache[$sObject][$sId]))
+		{
+			return self::$aCache[$sObject][$sId];
+		}
+
+		return self::getOne(array(
+			self::getDef('sIdField') . ' = ?' => $sId
+		));
 	}
 
 	/**
-	 * @param array $aConditionBinds array(array('condition', $value, $value), array('condition', $value, $value))
+	 * @param array $aCondition array('a = 1' => null, 'b = ?' => $value), 'c BETWEEN ? AND ?' => array($value, $value))
 	 *
 	 * @return ActiveRecord|bool False on no result
 	 */
-	public static function getOne($aConditionBinds)
+	public static function getOne($aCondition = array())
 	{
-		$aResult = self::getMany($aConditionBinds);
+		$aResult = self::getMany($aCondition);
 
 		return reset($aResult);
 	}
 
 	/**
-	 * @param array $aConditionBinds Key: field name, Value: field value
+	 * @param array $aCondition array('a = 1' => null, 'b = ?' => $value), 'c BETWEEN ? AND ?' => array($value, $value))
 	 *
 	 * @return array|ActiveRecord[] Empty result is empty array
 	 */
-	public static function getMany($aConditionBinds)
+	public static function getMany($aCondition = array())
+	{
+		if(!count($aCondition))
+		{
+			return self::getManyByWhere();
+		}
+
+		$sWhere = join(' AND ', array_keys($aCondition));
+
+		$aParams = array();
+
+		foreach(array_values($aCondition) as $aConditionParams)
+		{
+			if($aConditionParams === null)
+			{
+				continue;
+			}
+
+			if(!is_array($aConditionParams))
+			{
+				$aConditionParams = array($aConditionParams);
+			}
+
+			$aParams = array_merge($aParams, $aConditionParams);
+		}
+
+		return self::getManyByWhere($sWhere, $aParams);
+	}
+
+	/**
+	 * @param string $sWhere
+	 * @param null|array $aParams
+	 *
+	 * @return ActiveRecord[]|array Empty result is empty array
+	 */
+	public static function getManyByWhere($sWhere = null, $aParams = null)
 	{
 		$sSql = 'SELECT %self.table%.*
-			FROM %self.table%
-			WHERE `' . join('` = ? AND `', array_keys($aConditionBinds)) . '` = ?';
+			FROM %self.table%';
 
-		return self::getManyBySql($sSql, array_values($aConditionBinds));
+		if($sWhere)
+		{
+			$sSql .= ' WHERE ' . $sWhere;
+		}
+
+		return self::getManyBySql($sSql, $aParams);
 	}
 
 	/**
@@ -284,6 +327,8 @@ abstract class ActiveRecord
 			}
 			return '\\' . $sNamespace . $sCalledClass;
 		}
+
+		return $sCalledClass;
 	}
 
 	/**
