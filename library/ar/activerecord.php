@@ -255,25 +255,32 @@ abstract class ActiveRecord
 	 */
 	private static function getClassName($sCalledClass = null)
 	{
-		$sSelf = get_called_class();
-		if($sCalledClass == null)
+		//If no value or 'self' keyword, it's this class
+		if($sCalledClass == null || $sCalledClass == 'self')
 		{
-			$sCalledClass = $sSelf;
+			$sCalledClass = '\\' . get_called_class();
 		}
 
-		$sClass = trim(substr($sCalledClass, strrpos($sCalledClass, '\\')), '\\');
-		if($sClass == 'self')
+		//If there is no namespaces mentioned, use this class' namespace (if exists)
+		if(!stristr($sCalledClass, '\\'))
 		{
-			$sClass = trim(substr($sSelf, strrpos($sSelf, '\\')), '\\');
+			$sSelfClass = get_called_class();
+			$sNamespace = substr($sSelfClass, 0, strrpos($sSelfClass, '\\'));
+			if($sNamespace)
+			{
+				$sNamespace = $sNamespace . '\\';
+			}
+			$sCalledClass = '\\' . $sNamespace . $sCalledClass;
 		}
 
-		$sNamespace = '\\';
-		if(stristr($sSelf, '\\'))
+		//If path is relative (no \ in beginning), append this class' namespace to the beginning
+		if($sCalledClass{0} != '\\')
 		{
-			$sNamespace .= substr($sSelf, 0, strrpos($sSelf, '\\') + 1);
+			$sSelfClass = get_called_class();
+			$sCalledClass = '\\' . trim(substr($sSelfClass, 0, strrpos($sSelfClass, '\\')), '\\') . '\\' . $sCalledClass;
 		}
 
-		return $sNamespace . $sClass;
+		return $sCalledClass;
 	}
 
 	/**
