@@ -47,7 +47,7 @@ abstract class ActiveRecord
 	}
 
 	/**
-	 * @param array $aCondition array('a = 1' => null, 'b = ?' => $value), 'c BETWEEN ? AND ?' => array($value, $value))
+	 * @param array $aCondition array('a = 1' => null, 'b = ?' => $value, 'c BETWEEN ? AND ?' => array($value, $value))
 	 *
 	 * @return ActiveRecord|bool False on no result
 	 */
@@ -59,7 +59,7 @@ abstract class ActiveRecord
 	}
 
 	/**
-	 * @param array $aCondition array('a = 1' => null, 'b = ?' => $value), 'c BETWEEN ? AND ?' => array($value, $value))
+	 * @param array $aCondition array('a = 1' => null, 'b = ?' => $value, 'c BETWEEN ? AND ?' => array($value, $value))
 	 *
 	 * @return array|ActiveRecord[] Empty result is empty array
 	 */
