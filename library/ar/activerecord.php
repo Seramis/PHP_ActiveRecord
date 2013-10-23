@@ -557,6 +557,7 @@ abstract class ActiveRecord
 				return false;
 			}
 		}
+		unset($mValue);
 
 		if($this->getId() === null)
 		{
@@ -608,6 +609,7 @@ abstract class ActiveRecord
 				$this->{'_postSave_' . $sKey}($mValue);
 			}
 		}
+		unset($mValue);
 
 		return true;
 	}
