@@ -106,31 +106,43 @@ ActiveRecord has ability to execute different triggers. Triggers are (in order):
 	* Value can be modified
 
 ### Set ###
-* `_preSet(field_name, &field_value)`
+* `_preSet(field_name, &field_value, field_value_old)`
 	* Before set
 	* Can modify value
 	* Can return false to prevent set
-* `_preSet_field_name(&field_value)`
+* `_preSet_field_name(&field_value, field_value_old)`
 	* Before set
 	* Can modify value
 	* Can return false to prevent set
-* `_postSet_field_name(field_value)`
+* `_postSet_field_name(field_value, field_value_old)`
 	* After set
-* `_postSet(field_name, field_value)`
+* `_postSet(field_name, field_value, field_value_old)`
 	* After set
 
 ### Save ###
-* `_preSave(&field_value_array)`
+* `[_preCreate(&field_value_array)]`
+	* Before saving new AR
+	* Can modify array of fields
+	* Can return false to prevent save
+* `[_preCreate_field_name(&field_value, field_value_old)]`
+	* Before saving new AR
+	* Can modify value
+	* Can return false to prevent save
+* `_preSave(&field_value_array, field_value_array_old)`
 	* Before saving
 	* Can modify array of fields
 	* Can return false to prevent save
-* `_preSave_field_name(&field_value)`
+* `_preSave_field_name(&field_value, field_value_old)`
 	* Before saving
 	* Can modify value
 	* Can return false to prevent save
-* `_postSave_field_name(field_value)`
-	* After saving
-* `_postSave(field_value_array)`
+* `[_postCreate(field_value_array)]`
+    * After saving new AR
+* `[_postCreate_field_name(field_value)]`
+	* After saving new AR
+* `_postSave(field_value_array, field_value_array_old)`
+    * After saving
+* `_postSave_field_name(field_value, field_value_old)`
 	* After saving
 
 ### Delete ###

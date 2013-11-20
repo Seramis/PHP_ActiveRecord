@@ -32,7 +32,7 @@ abstract class ActiveRecord
 	 *
 	 * @return ActiveRecord|bool False on no result
 	 */
-	public static function getById($sId)
+	public static function getById($sId, $bOnlyFromCache = false)
 	{
 		$sObject = self::getClassName();
 
@@ -41,33 +41,40 @@ abstract class ActiveRecord
 			return self::$aCache[$sObject][$sId];
 		}
 
-		return self::getOne(array(
-			self::getDef('sIdField') . ' = ?' => $sId
+		if($bOnlyFromCache)
+		{
+			return false;
+		}
+
+		return static::getOne(array(
+			static::getDef('sIdField') . ' = ?' => $sId
 		));
 	}
 
 	/**
 	 * @param array $aCondition array('a = 1' => null, 'b = ?' => $value, 'c BETWEEN ? AND ?' => array($value, $value))
+	 * @param null|string $sSuffix Example: ORDER BY id DESC
 	 *
 	 * @return ActiveRecord|bool False on no result
 	 */
-	public static function getOne($aCondition = array())
+	public static function getOne($aCondition = array(), $sSuffix = null)
 	{
-		$aResult = self::getMany($aCondition);
+		$aResult = static::getMany($aCondition, $sSuffix);
 
 		return reset($aResult);
 	}
 
 	/**
 	 * @param array $aCondition array('a = 1' => null, 'b = ?' => $value, 'c BETWEEN ? AND ?' => array($value, $value))
+	 * @param null|string $sSuffix Example: ORDER BY id DESC
 	 *
 	 * @return array|ActiveRecord[] Empty result is empty array
 	 */
-	public static function getMany($aCondition = array())
+	public static function getMany($aCondition = array(), $sSuffix = null)
 	{
 		if(!count($aCondition))
 		{
-			return self::getManyByWhere();
+			return static::getManyByWhere(null, null, $sSuffix);
 		}
 
 		$sWhere = join(' AND ', array_keys($aCondition));
@@ -89,16 +96,17 @@ abstract class ActiveRecord
 			$aParams = array_merge($aParams, $aConditionParams);
 		}
 
-		return self::getManyByWhere($sWhere, $aParams);
+		return static::getManyByWhere($sWhere, $aParams, $sSuffix);
 	}
 
 	/**
 	 * @param string $sWhere
 	 * @param null|array $aParams
+	 * @param null|string $sSuffix Example: ORDER BY id DESC
 	 *
 	 * @return ActiveRecord[]|array Empty result is empty array
 	 */
-	public static function getManyByWhere($sWhere = null, $aParams = null)
+	public static function getManyByWhere($sWhere = null, $aParams = null, $sSuffix = null)
 	{
 		$sSql = 'SELECT %self.table%.*
 			FROM %self.table%';
@@ -108,7 +116,12 @@ abstract class ActiveRecord
 			$sSql .= ' WHERE ' . $sWhere;
 		}
 
-		return self::getManyBySql($sSql, $aParams);
+		if($sSuffix)
+		{
+			$sSql .= ' ' . $sSuffix;
+		}
+
+		return static::getManyBySql($sSql, $aParams);
 	}
 
 	/**
@@ -141,7 +154,7 @@ abstract class ActiveRecord
 				$oObject = self::getObject($aMap[$sTable], $aData);
 
 				//It's our table and we don't object in resultset yet
-				if($sTable == self::getDef('sTable') && !in_array($oObject, $aResult))
+				if($sTable == static::getDef('sTable') && !in_array($oObject, $aResult))
 				{
 					$aResult[] = $oObject;
 				}
@@ -224,7 +237,7 @@ abstract class ActiveRecord
 				trigger_error('Unable to find model "' . $sObject . '" while parsing query! Query: ' . $sSql, E_USER_ERROR);
 			}
 
-			//We don't need to add ourselves to map and also we dont need to put same thing in map multiple times
+			//We don't need to put same thing in map multiple times
 			if(!isset($aMap[$sObject::getDef('sTable')]))
 			{
 				$aMap[$sObject::getDef('sTable')] = $sObject;
@@ -334,16 +347,13 @@ abstract class ActiveRecord
 	/**
 	 * Create new ActiveRecord.
 	 *
-	 * @param array $aSetData Set array as new content for AR
+	 * @param array|ActiveRecord $aData Array or object from where data will be read in.
 	 */
-	public function __construct($aSetData = array())
+	public function __construct($mData = array())
 	{
-		if(count($aSetData))
+		if(count($mData))
 		{
-			foreach($aSetData as $sName => $mValue)
-			{
-				$this->$sName = $mValue;
-			}
+			$this->setMany($mData);
 		}
 
 		//It's new AR, there's no ID
@@ -357,7 +367,7 @@ abstract class ActiveRecord
 	 */
 	public function __isset($sKey)
 	{
-		return in_array($sKey, self::getDef('aField'));
+		return in_array($sKey, static::getDef('aField'));
 	}
 
 	/**
@@ -380,7 +390,7 @@ abstract class ActiveRecord
 			trigger_error('Trying to set non-existing property of "' . $sKey . '"!', E_USER_ERROR);
 		}
 
-		if($this->getIsInDb() && array_key_exists($sKey, $this->aNewData))
+		if($this->isInDb() && array_key_exists($sKey, $this->aNewData))
 		{
 			trigger_error('Trying to get value of property "' . $sKey . '" that is set but not saved!', E_USER_ERROR);
 		}
@@ -402,13 +412,13 @@ abstract class ActiveRecord
 		}
 
 		//Getting the value
-		if($sKey == self::getDef('sIdField'))
+		if($sKey == static::getDef('sIdField'))
 		{
 			$mValue = $this->getId();
 		}
 		else
 		{
-			if($this->getIsInDb())
+			if($this->isInDb())
 			{
 				$this->load();
 				$mValue = $this->aData[$sKey];
@@ -449,22 +459,28 @@ abstract class ActiveRecord
 	 */
 	public function __set($sKey, $mValue)
 	{
-		if($sKey == self::getDef('sIdField'))
+		if($sKey == static::getDef('sIdField') && $this->isInDb())
 		{
-			trigger_error('You can not set id!', E_USER_ERROR);
+			trigger_error('You can not set id of existing row in DB!', E_USER_ERROR);
+		}
+
+		$mOldValue = null;
+		if($this->bLoaded)
+		{
+			$mOldValue = $this->aData[$sKey];
 		}
 
 		//_pre events
 		if(method_exists($this, '_preSet'))
 		{
-			if($this->{'_preSet'}($sKey, $mValue) === false)
+			if($this->{'_preSet'}($sKey, $mValue, $mOldValue) === false)
 			{
 				return false;
 			}
 		}
 		if(method_exists($this, '_preSet_' . $sKey))
 		{
-			if($this->{'_preSet_' . $sKey}($mValue) === false)
+			if($this->{'_preSet_' . $sKey}($mValue, $mOldValue) === false)
 			{
 				return false;
 			}
@@ -481,11 +497,11 @@ abstract class ActiveRecord
 		//_post events
 		if(method_exists($this, '_postSet_' . $sKey))
 		{
-			$this->{'_postSet_' . $sKey}($mValue);
+			$this->{'_postSet_' . $sKey}($mValue, $mOldValue);
 		}
 		if(method_exists($this, '_postSet'))
 		{
-			$this->{'_postSet'}($sKey, $mValue);
+			$this->{'_postSet'}($sKey, $mValue, $mOldValue);
 		}
 
 		return $mValue;
@@ -496,13 +512,13 @@ abstract class ActiveRecord
 	 */
 	public function getId()
 	{
-		return $this->aData[self::getDef('sIdField')];
+		return $this->aData[static::getDef('sIdField')];
 	}
 
 	/**
 	 * @return bool
 	 */
-	public function getIsInDb()
+	public function isInDb()
 	{
 		return $this->getId() !== null;
 	}
@@ -513,6 +529,54 @@ abstract class ActiveRecord
 	public function setNotLoaded()
 	{
 		$this->bLoaded = false;
+	}
+
+	/**
+	 * If given field is set but not saved, returns true.
+	 * If no field is given, returns true if any field is set but not saved.
+	 *
+	 * @param string|null $sFieldName
+	 * @return bool
+	 */
+	public function isDirty($sFieldName = null)
+	{
+		if($sFieldName !== null)
+		{
+			return array_key_exists($sFieldName, $this->aNewData);
+		}
+
+		return count($this->aNewData) > 0;
+	}
+
+	/**
+	 * Sets data from array or another object. Skips all fields not present in input and AR's ID field.
+	 *
+	 * @param array|ActiveRecord $mData
+	 * @return boolean
+	 */
+	public function setMany($mData)
+	{
+		foreach(static::getDef('aField') as $sField)
+		{
+			if($sField == static::getDef('sIdField'))
+			{
+				continue;
+			}
+
+			if(is_object($mData) && isset($mData->$sField))
+			{
+				$this->$sField = $mData->$sField;
+				continue;
+			}
+
+			if(is_array($mData) && isset($mData[$sField]))
+			{
+				$this->$sField = $mData[$sField];
+				continue;
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -527,8 +591,12 @@ abstract class ActiveRecord
 	 * Saves or creates row in DB.
 	 *
 	 * Save will trigger events:
+	 *    [_preCreate()]
+	 *    [_preCreate_field_name()]
 	 *    _preSave()
 	 *    _preSave_field_name()
+	 *    [_postCreate()]
+	 *    [_postCreate_field_name()]
 	 *    _postSave_field_name()
 	 *    _postSave()
 	 *
@@ -537,31 +605,60 @@ abstract class ActiveRecord
 	public function save()
 	{
 		//If we don't have anything to save, return null
-		if(!count($this->aNewData))
+		if(!$this->isDirty())
 		{
 			return null;
 		}
 
-		//_pre events
+		$bIsInDb = $this->isInDb();
+
+		//_preCreate triggers (only triggered, if insert will be done)
+		if(!$bIsInDb)
+		{
+			if(method_exists($this, '_preCreate'))
+			{
+				if($this->{'_preCreate'}($this->aNewData) === false)
+				{
+					return false;
+				}
+			}
+
+			foreach($this->aNewData as $sKey => &$mValue)
+			{
+				if(method_exists($this, '_preCreate_' . $sKey) && $this->{'_preCreate_' . $sKey}($mValue) === false)
+				{
+					return false;
+				}
+			}
+			unset($mValue);
+		}
+
+		//_preSave triggers (always triggered)
 		if(method_exists($this, '_preSave'))
 		{
-			if($this->{'_preSave'}($this->aNewData) === false)
+			if($this->{'_preSave'}($this->aNewData, $this->aData) === false)
 			{
 				return false;
 			}
 		}
 		foreach($this->aNewData as $sKey => &$mValue)
 		{
-			if(method_exists($this, '_preSave_' . $sKey) && $this->{'_preSave_' . $sKey}($mValue) === false)
+			$mOldValue = null;
+			if(array_key_exists($sKey, $this->aData))
+			{
+				$mOldValue = $this->aData[$sKey];
+			}
+
+			if(method_exists($this, '_preSave_' . $sKey) && $this->{'_preSave_' . $sKey}($mValue, $mOldValue) === false)
 			{
 				return false;
 			}
 		}
 		unset($mValue);
 
-		if($this->getId() === null)
+		if(!$bIsInDb)
 		{
-			$sSql = 'INSERT INTO `' . self::getDef('sTable') . '`
+			$sSql = 'INSERT INTO `' . static::getDef('sTable') . '`
 			 	(`' . join('`,`', array_keys($this->aNewData)) . '`)
 				VALUES
 				(' . trim(str_repeat('?,', count($this->aNewData)), ',') . ');';
@@ -569,7 +666,7 @@ abstract class ActiveRecord
 			self::$oPdo->prepare($sSql)
 				->execute(array_values($this->aNewData));
 
-			$this->aData[self::getDef('sIdField')] = self::$oPdo->lastInsertId();
+			$this->aData[static::getDef('sIdField')] = self::$oPdo->lastInsertId();
 
 			//Insert object into cache
 			$sObject = self::getClassName();
@@ -578,13 +675,13 @@ abstract class ActiveRecord
 		}
 		else
 		{
-			$sSql = 'UPDATE `' . self::getDef('sTable') . '` SET ';
+			$sSql = 'UPDATE `' . static::getDef('sTable') . '` SET ';
 			foreach(array_keys($this->aNewData) as $sField)
 			{
 				$sSql .= '`' . $sField . '` = ?, ';
 			}
 			$sSql = trim($sSql, ' ,');
-			$sSql .= ' WHERE `' . self::getDef('sIdField') . '` = ?;';
+			$sSql .= ' WHERE `' . static::getDef('sIdField') . '` = ?;';
 
 			$aParams = array_values($this->aNewData);
 			$aParams[] = $this->getId();
@@ -594,19 +691,43 @@ abstract class ActiveRecord
 		}
 
 		$aNewData = $this->aNewData;
+		$aOldData = $this->aData;
 		$this->aNewData = array();
 		$this->setNotLoaded();
 
-		//_post events
+		//_postCreate triggers
+		if(!$bIsInDb)
+		{
+			if(method_exists($this, '_postCreate'))
+			{
+				$this->{'_postCreate'}($aNewData);
+			}
+			foreach($aNewData as $sKey => $mValue)
+			{
+				if(method_exists($this, '_postCreate_' . $sKey))
+				{
+					$this->{'_postCreate_' . $sKey}($mValue);
+				}
+			}
+			unset($mValue);
+		}
+
+		//_postSave triggers
 		if(method_exists($this, '_postSave'))
 		{
-			$this->{'_postSave'}($aNewData);
+			$this->{'_postSave'}($aNewData, $aOldData);
 		}
 		foreach($aNewData as $sKey => $mValue)
 		{
+			$mOldValue = null;
+			if(array_key_exists($sKey, $aOldData))
+			{
+				$mOldValue = $aOldData[$sKey];
+			}
+
 			if(method_exists($this, '_postSave_' . $sKey))
 			{
-				$this->{'_postSave_' . $sKey}($mValue);
+				$this->{'_postSave_' . $sKey}($mValue, $mOldValue);
 			}
 		}
 		unset($mValue);
@@ -626,7 +747,7 @@ abstract class ActiveRecord
 	 */
 	public function delete()
 	{
-		if(!$this->getIsInDb())
+		if(!$this->isInDb())
 		{
 			trigger_error('Trying to delete object that is not in DB!', E_USER_ERROR);
 		}
@@ -636,7 +757,7 @@ abstract class ActiveRecord
 			return false;
 		}
 
-		self::$oPdo->prepare('DELETE FROM `' . self::getDef('sTable') . '` WHERE `' . self::getDef('sIdField') . '` = ?;')
+		self::$oPdo->prepare('DELETE FROM `' . static::getDef('sTable') . '` WHERE `' . static::getDef('sIdField') . '` = ?;')
 			->execute(array($this->getId()));
 
 		//Delete object from cache
@@ -650,7 +771,7 @@ abstract class ActiveRecord
 
 		$this->setNotLoaded();
 
-		$this->aData[self::getDef('sIdField')] = null; //Reset ID, we are now not in DB
+		$this->aData[static::getDef('sIdField')] = null; //Reset ID, we are now not in DB
 
 		return true;
 	}
@@ -662,7 +783,7 @@ abstract class ActiveRecord
 	 */
 	private function init($sId = null)
 	{
-		$this->aData[self::getDef('sIdField')] = $sId;
+		$this->aData[static::getDef('sIdField')] = $sId;
 	}
 
 	/**
@@ -678,8 +799,8 @@ abstract class ActiveRecord
 		}
 
 		$sSql = 'SELECT *
-			FROM `' . self::getDef('sTable') . '`
-			WHERE `' . self::getDef('sIdField') . '` = ?
+			FROM `' . static::getDef('sTable') . '`
+			WHERE `' . static::getDef('sIdField') . '` = ?
 			LIMIT 1;';
 
 		$oStmt = self::$oPdo->prepare($sSql);
@@ -687,7 +808,7 @@ abstract class ActiveRecord
 
 		$aData = self::pdoFetchAllNested($oStmt);
 
-		return $this->loadFromArray($aData[self::getDef('sTable')][0]);
+		return $this->loadFromArray($aData[static::getDef('sTable')][0]);
 	}
 
 	/**
@@ -701,8 +822,8 @@ abstract class ActiveRecord
 	{
 		$this->setNotLoaded();
 
-		$aFieldsMandatory = self::getDef('aField');
-		unset($aFieldsMandatory[array_search(self::getDef('sIdField'), $aFieldsMandatory)]);
+		$aFieldsMandatory = static::getDef('aField');
+		unset($aFieldsMandatory[array_search(static::getDef('sIdField'), $aFieldsMandatory)]);
 
 		$aMissingFields = array_diff($aFieldsMandatory, array_keys($aData));
 
