@@ -81,6 +81,7 @@ First it contains definition of the active record. Quite simple, probably doesn'
 
 It uses triggers to keep firstname and surname field value in proper format, that is every name starts with capital letter and the rest is lowercased. It is done in postGet triggers (to get proper values from DB) and preSet triggers. (So proper names are going in to the DB)
 It also uses preSave trigger to prevent saving, if saved e-mail does not include '@' character.
+(Triggers are mot required to be implemented)
 
 So...
 
@@ -119,12 +120,26 @@ ActiveRecord has ability to execute different triggers. Triggers are (in order):
 * `_postSet(field_name, field_value, field_value_old)`
 	* After set
 
+### Load ###
+* `_preLoad(&field_value_array, field_value_array_old)`
+	* Before loading
+	* Can modify array of fields
+	* Can return false to prevent load
+* `_preLoad_field_name(&field_value, field_value_old, &field_value_array, field_value_array_old)`
+	* Before loading
+	* Can modify value
+	* Can return false to prevent load
+* `_postLoad_field_name(&field_value, field_value_old, &field_value_array, field_value_array_old)`
+	* After saving (object not set as loaded yet)
+* `_postLoad(&field_value_array, field_value_array_old)`
+    * After loading (object not set as loaded yet)
+
 ### Save ###
 * `[_preCreate(&field_value_array)]`
 	* Before saving new AR
 	* Can modify array of fields
 	* Can return false to prevent save
-* `[_preCreate_field_name(&field_value, field_value_old)]`
+* `[_preCreate_field_name(&field_value, &field_value_array)]`
 	* Before saving new AR
 	* Can modify value
 	* Can return false to prevent save
@@ -132,18 +147,18 @@ ActiveRecord has ability to execute different triggers. Triggers are (in order):
 	* Before saving
 	* Can modify array of fields
 	* Can return false to prevent save
-* `_preSave_field_name(&field_value, field_value_old)`
+* `_preSave_field_name(&field_value, field_value_old, &field_value_array, field_value_array_old)`
 	* Before saving
 	* Can modify value
 	* Can return false to prevent save
-* `[_postCreate(field_value_array)]`
-    * After saving new AR
-* `[_postCreate_field_name(field_value)]`
-	* After saving new AR
+* `_postSave_field_name(field_value, field_value_old, field_value_array, field_value_array_old)`
+	* After saving
 * `_postSave(field_value_array, field_value_array_old)`
     * After saving
-* `_postSave_field_name(field_value, field_value_old)`
-	* After saving
+* `[_postCreate_field_name(field_value, field_value_array)]`
+	* After saving new AR
+* `[_postCreate(field_value_array)]`
+    * After saving new AR
 
 ### Delete ###
 * `_preDelete()`
@@ -229,6 +244,16 @@ $oUser->save();
 //INSERT INTO user (`firstname`,`surname`,`mail`) VALUES ('Foo Bar', 'Doe', 'john@doe.com')
 ```
 
+But another interesting thing is shown here. `%placeholders%`
+
+## Placeholders ##
+Placeholders can be used in sql to refer to model's properties like table name or id field name. The format is `%Model.property%`.
+Properties can be `table` and `id`, which represent table name and id field name accordingly.
+
+So when we are asking for posts, we can refer to post table like `%self.table%` or `%Post.table%`. `self` is a special keyword that is translated to Model, you are asking.
+
+**Remember that the first part is model name, not table name.** You don't have to know any table's name or write them into sql.
+
 ## N+1 SELECT problem? ##
 We have a solution for that too! Check that out:
 ```php
@@ -246,16 +271,6 @@ As we selected data from multiple tables, ActiveRecord was able to cache all Use
 
 It supports all kinds of joins. It's basic SQL. So if you know, that querying out something in extra will benefit performance very well, you can do that, and ActiveRecord will cache all objects. Can it get any better?
 
-But another interesting thing is shown here. `%placeholders%`
-
-## Placeholders ##
-Placeholders can be used in sql to refer to model's properties like table name or id field name. The format is `%Model.property%`.
-Properties can be `table` and `id`, which represent table name and id field name accordingly.
-
-So when we are asking for posts, we can refer to post table like `%self.table%` or `%Post.table%`. `self` is a special keyword that is translated to Model, you are asking.
-
-**Remember that the first part is model name, not table name.** You don't have to know any table's name or write them into sql.
-
 ## What about data validators? ##
 ActiveRecord is row in DB. DB row doesn't know, how to validate data. It knows, how to hold data. So, data validation is not a job to be done by ActiveRecord.
 If you want to add validator, it's easy: you get your favorite data validator and attach it to triggers ActiveRecord provides. No chemistry, everything is plain simple!
@@ -263,7 +278,7 @@ If you want to add validator, it's easy: you get your favorite data validator an
 ## Licence ##
 The MIT License (MIT)
 
-Copyright (c) 2013 Joonatan Uusväli
+Copyright (c) 2014 Joonatan Uusväli
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in

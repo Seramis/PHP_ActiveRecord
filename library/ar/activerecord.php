@@ -29,11 +29,17 @@ abstract class ActiveRecord
 
 	/**
 	 * @param string $sId
+	 * @param bool $bOnlyFromCache If true, will return AR only, if it's already in cache
 	 *
 	 * @return ActiveRecord|bool False on no result
 	 */
 	public static function getById($sId, $bOnlyFromCache = false)
 	{
+		if($sId == null)
+		{
+			return false;
+		}
+
 		$sObject = self::getClassName();
 
 		if(isset(self::$aCache[$sObject][$sId]))
@@ -167,11 +173,11 @@ abstract class ActiveRecord
 	/**
 	 * Return definition(key)
 	 *
-	 * @param string $sKey
+	 * @param string|null $sKey Definition key. If left empty (null), everything is returned
 	 *
 	 * @return array|string
 	 */
-	protected static function getDef($sKey = null)
+	public static function getDef($sKey = null)
 	{
 		if($sKey === null)
 		{
@@ -595,10 +601,10 @@ abstract class ActiveRecord
 	 *    [_preCreate_field_name()]
 	 *    _preSave()
 	 *    _preSave_field_name()
-	 *    [_postCreate()]
-	 *    [_postCreate_field_name()]
 	 *    _postSave_field_name()
 	 *    _postSave()
+	 *    [_postCreate_field_name()]
+	 *    [_postCreate()]
 	 *
 	 * @return bool|null Was saving successful, NULL if nothing was saved
 	 */
@@ -625,7 +631,7 @@ abstract class ActiveRecord
 
 			foreach($this->aNewData as $sKey => &$mValue)
 			{
-				if(method_exists($this, '_preCreate_' . $sKey) && $this->{'_preCreate_' . $sKey}($mValue) === false)
+				if(method_exists($this, '_preCreate_' . $sKey) && $this->{'_preCreate_' . $sKey}($mValue, $this->aNewData) === false)
 				{
 					return false;
 				}
@@ -649,7 +655,7 @@ abstract class ActiveRecord
 				$mOldValue = $this->aData[$sKey];
 			}
 
-			if(method_exists($this, '_preSave_' . $sKey) && $this->{'_preSave_' . $sKey}($mValue, $mOldValue) === false)
+			if(method_exists($this, '_preSave_' . $sKey) && $this->{'_preSave_' . $sKey}($mValue, $mOldValue, $this->aNewData, $this->aData) === false)
 			{
 				return false;
 			}
@@ -695,28 +701,7 @@ abstract class ActiveRecord
 		$this->aNewData = array();
 		$this->setNotLoaded();
 
-		//_postCreate triggers
-		if(!$bIsInDb)
-		{
-			if(method_exists($this, '_postCreate'))
-			{
-				$this->{'_postCreate'}($aNewData);
-			}
-			foreach($aNewData as $sKey => $mValue)
-			{
-				if(method_exists($this, '_postCreate_' . $sKey))
-				{
-					$this->{'_postCreate_' . $sKey}($mValue);
-				}
-			}
-			unset($mValue);
-		}
-
 		//_postSave triggers
-		if(method_exists($this, '_postSave'))
-		{
-			$this->{'_postSave'}($aNewData, $aOldData);
-		}
 		foreach($aNewData as $sKey => $mValue)
 		{
 			$mOldValue = null;
@@ -727,10 +712,31 @@ abstract class ActiveRecord
 
 			if(method_exists($this, '_postSave_' . $sKey))
 			{
-				$this->{'_postSave_' . $sKey}($mValue, $mOldValue);
+				$this->{'_postSave_' . $sKey}($mValue, $mOldValue, $aNewData, $aOldData);
 			}
 		}
 		unset($mValue);
+		if(method_exists($this, '_postSave'))
+		{
+			$this->{'_postSave'}($aNewData, $aOldData);
+		}
+
+		//_postCreate triggers
+		if(!$bIsInDb)
+		{
+			foreach($aNewData as $sKey => $mValue)
+			{
+				if(method_exists($this, '_postCreate_' . $sKey))
+				{
+					$this->{'_postCreate_' . $sKey}($mValue, $aNewData);
+				}
+			}
+			unset($mValue);
+			if(method_exists($this, '_postCreate'))
+			{
+				$this->{'_postCreate'}($aNewData);
+			}
+		}
 
 		return true;
 	}
@@ -814,6 +820,12 @@ abstract class ActiveRecord
 	/**
 	 * Fills ActiveRecord with data and sets ActiveRecord as loaded.
 	 *
+	 * Will trigger events:
+	 *    _preLoad()
+	 *    _preLoad_field_name()
+	 *    _postLoad_field_name()
+	 *    _postLoad()
+	 *
 	 * @param array $aData
 	 *
 	 * @return bool
@@ -832,10 +844,52 @@ abstract class ActiveRecord
 			trigger_error('Loading array is missing fields: ' . join(', ', $aMissingFields) . '!', E_USER_ERROR);
 		}
 
+		//_preLoad triggers
+		if(method_exists($this, '_preLoad'))
+		{
+			if($this->{'_preLoad'}($aData, $this->aData) === false)
+			{
+				return false;
+			}
+		}
+		foreach($aFieldsMandatory as $sField)
+		{
+			$mOldValue = null;
+			if(array_key_exists($sField, $this->aData))
+			{
+				$mOldValue = $this->aData[$sField];
+			}
+
+			if(method_exists($this, '_preLoad_' . $sField) && $this->{'_preLoad_' . $sField}($aData[$sField], $mOldValue, $aData, $this->aData) === false)
+			{
+				return false;
+			}
+		}
+
+		$aOldData = $this->aData;
 		$this->aData = array_merge(
 			$this->aData,
 			array_intersect_key($aData, array_flip($aFieldsMandatory))
 		);
+
+		//_postLoad triggers
+		foreach($aFieldsMandatory as $sField)
+		{
+			$mOldValue = null;
+			if(array_key_exists($sField, $aOldData))
+			{
+				$mOldValue = $aOldData[$sField];
+			}
+
+			if(method_exists($this, '_postLoad_' . $sField))
+			{
+				$this->{'_postLoad_' . $sField}($this->aData[$sField], $mOldValue, $this->aData, $aOldData);
+			}
+		}
+		if(method_exists($this, '_postLoad'))
+		{
+			$this->{'_postLoad'}($this->aData, $aOldData);
+		}
 
 		$this->bLoaded = true;
 
