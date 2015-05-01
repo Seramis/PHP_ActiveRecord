@@ -6,8 +6,7 @@ abstract class ActiveRecord
 {
 	protected static $aDefinition = array(
 		'sTable' => null,
-		'sIdField' => null,
-		'aField' => array()
+		'sIdField' => null
 	);
 
 	/** @var array[] */
@@ -226,8 +225,8 @@ abstract class ActiveRecord
 		/** @var ActiveRecord $oObject */
 		$oObject = self::$aCache[$sObject][$sId];
 
-		//If object is not loaded and we have all fields, we can preload object
-		if(!$oObject->bLoaded && count(array_diff($sObject::getDef('aField'), array_keys($aDataArray))) == 0)
+		//If object is not loaded we can preload object
+		if(!$oObject->bLoaded)
 		{
 			$oObject->loadFromArray($aDataArray);
 		}
@@ -386,7 +385,7 @@ abstract class ActiveRecord
 	 */
 	public function __isset($sKey)
 	{
-		return in_array($sKey, static::getDef('aField'));
+		return in_array($sKey, array_merge(array_keys($this->aData), array_keys($this->aNewData)));
 	}
 
 	/**
@@ -406,12 +405,7 @@ abstract class ActiveRecord
 	{
 		if(!$this->__isset($sKey))
 		{
-			trigger_error('Trying to set non-existing property of "' . $sKey . '"!', E_USER_ERROR);
-		}
-
-		if($this->isInDb() && array_key_exists($sKey, $this->aNewData))
-		{
-			trigger_error('Trying to get value of property "' . $sKey . '" that is set but not saved!', E_USER_ERROR);
+			trigger_error('Trying to get non-existing property of "' . $sKey . '"!', E_USER_WARNING);
 		}
 
 		//_pre events
@@ -440,11 +434,16 @@ abstract class ActiveRecord
 			if($this->isInDb())
 			{
 				$this->load();
-				$mValue = $this->aData[$sKey];
 			}
-			else //If not in DB, return new value or NULL, when value is unset
+
+			$mValue = null;
+			if(array_key_exists($sKey, $this->aNewData))
 			{
-				$mValue = array_key_exists($sKey, $this->aNewData) ? $this->aNewData[$sKey] : null;
+				$mValue = $this->aNewData[$sKey];
+			}
+			elseif(array_key_exists($sKey, $this->aData))
+			{
+				$mValue = $this->aData[$sKey];
 			}
 		}
 
@@ -486,7 +485,7 @@ abstract class ActiveRecord
 		$mOldValue = null;
 		if($this->bLoaded)
 		{
-			$mOldValue = $this->aData[$sKey];
+			$mOldValue = array_key_exists($sKey, $this->aData) ? $this->aData[$sKey] : null;
 		}
 
 		//_pre events
@@ -508,7 +507,7 @@ abstract class ActiveRecord
 		$this->aNewData[$sKey] = $mValue;
 
 		//If we are loaded and we can see, that new value is same as old one, no need to keep that value.
-		if($this->bLoaded && $this->aNewData[$sKey] == $this->aData[$sKey])
+		if($this->bLoaded && array_key_exists($sKey, $this->aData) && $this->aNewData[$sKey] == $this->aData[$sKey])
 		{
 			unset($this->aNewData[$sKey]);
 		}
@@ -524,6 +523,14 @@ abstract class ActiveRecord
 		}
 
 		return $mValue;
+	}
+
+	public function __unset($sKey)
+	{
+		if(array_key_exists($sKey, $this->aNewData))
+		{
+			unset($this->aNewData[$sKey]);
+		}
 	}
 
 	/**
@@ -577,11 +584,6 @@ abstract class ActiveRecord
 	{
 		foreach(static::getDef('aField') as $sField)
 		{
-			if($sField == static::getDef('sIdField'))
-			{
-				continue;
-			}
-
 			if(is_object($mData) && isset($mData->$sField))
 			{
 				$this->$sField = $mData->$sField;
@@ -682,8 +684,10 @@ abstract class ActiveRecord
 				VALUES
 				(' . trim(str_repeat('?,', count($this->aNewData)), ',') . ');';
 
-			self::getPdo()->prepare($sSql)
-				->execute(array_values($this->aNewData));
+			if(!self::getPdo()->prepare($sSql)->execute(array_values($this->aNewData)))
+			{
+				trigger_error('Insert into database failed!', E_USER_ERROR);
+			}
 
 			$this->aData[static::getDef('sIdField')] = self::getPdo()->lastInsertId();
 
@@ -705,8 +709,10 @@ abstract class ActiveRecord
 			$aParams = array_values($this->aNewData);
 			$aParams[] = $this->getId();
 
-			self::getPdo()->prepare($sSql)
-				->execute($aParams);
+			if(!self::getPdo()->prepare($sSql)->execute($aParams))
+			{
+				trigger_error('Update into database failed!', E_USER_ERROR);
+			}
 		}
 
 		$aNewData = $this->aNewData;
@@ -847,16 +853,6 @@ abstract class ActiveRecord
 	{
 		$this->setNotLoaded();
 
-		$aFieldsMandatory = static::getDef('aField');
-		unset($aFieldsMandatory[array_search(static::getDef('sIdField'), $aFieldsMandatory)]);
-
-		$aMissingFields = array_diff($aFieldsMandatory, array_keys($aData));
-
-		if(count($aMissingFields))
-		{
-			trigger_error('Loading array is missing fields: ' . join(', ', $aMissingFields) . '!', E_USER_ERROR);
-		}
-
 		//_preLoad triggers
 		if(method_exists($this, '_preLoad'))
 		{
@@ -865,7 +861,7 @@ abstract class ActiveRecord
 				return false;
 			}
 		}
-		foreach($aFieldsMandatory as $sField)
+		foreach(array_keys($aData) as $sField)
 		{
 			$mOldValue = null;
 			if(array_key_exists($sField, $this->aData))
@@ -882,11 +878,11 @@ abstract class ActiveRecord
 		$aOldData = $this->aData;
 		$this->aData = array_merge(
 			$this->aData,
-			array_intersect_key($aData, array_flip($aFieldsMandatory))
+			$aData
 		);
 
 		//_postLoad triggers
-		foreach($aFieldsMandatory as $sField)
+		foreach(array_keys($aData) as $sField)
 		{
 			$mOldValue = null;
 			if(array_key_exists($sField, $aOldData))
