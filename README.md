@@ -172,8 +172,16 @@ ActiveRecord has ability to execute different triggers. Triggers are (in order):
 
 ## Let's play! ##
 ```php
-\AR\ActiveRecord::setPdo(new PDO('mysql:host=localhost;dbname=db_name;charset=utf8', 'username', 'password'));
 //Set up connection for ActiveRecord to use
+//PDO is injected with anonymous function so when it happens that PDO is never used, connection is never made
+\Ar\ActiveRecord::setPdoGetter(function(){
+	static $oPdo;
+	if(!$oPdo)
+	{
+		$oPdo = new PDO('mysql:host=localhost;dbname=db_name;charset=utf8', 'username', 'password');
+	}
+	return $oPdo;
+});
 
 $oUser = new User();
 

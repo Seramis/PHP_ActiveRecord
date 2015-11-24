@@ -12,19 +12,32 @@ abstract class ActiveRecord
 
 	/** @var array[] */
 	private static $aCache = array();
-	/** @var \PDO */
-	private static $oPdo = null;
+	/** @var callable $fGetter */
+	private static $fPdoGetter = null;
 
 	private $bLoaded = false;
 	private $aData = array();
 	private $aNewData = array();
 
 	/**
-	 * @param \PDO $oPdo
+	 * Define anonymous function to get PDO object.
+	 *
+	 * @param callable $fPdoGetter Callable anonymous function
 	 */
-	public static function setPdo(\PDO $oPdo)
+	public static function setPdoGetter(callable $fPdoGetter)
 	{
-		self::$oPdo = $oPdo;
+		self::$fPdoGetter = $fPdoGetter;
+	}
+
+	/**
+	 * Returns PDO object using PDO getter function
+	 *
+	 * @return \PDO
+	 */
+	private static function getPdo()
+	{
+		$fGetter = self::$fPdoGetter;
+		return $fGetter();
 	}
 
 	/**
@@ -147,7 +160,7 @@ abstract class ActiveRecord
 		//Parses sql and gives us map too
 		$aMap = self::parseQueryString($sSql);
 
-		$oStmt = self::$oPdo->prepare($sSql);
+		$oStmt = self::getPdo()->prepare($sSql);
 		$oStmt->execute($aParams);
 
 		$aResultSet = self::pdoFetchAllNested($oStmt);
@@ -669,10 +682,10 @@ abstract class ActiveRecord
 				VALUES
 				(' . trim(str_repeat('?,', count($this->aNewData)), ',') . ');';
 
-			self::$oPdo->prepare($sSql)
+			self::getPdo()->prepare($sSql)
 				->execute(array_values($this->aNewData));
 
-			$this->aData[static::getDef('sIdField')] = self::$oPdo->lastInsertId();
+			$this->aData[static::getDef('sIdField')] = self::getPdo()->lastInsertId();
 
 			//Insert object into cache
 			$sObject = self::getClassName();
@@ -692,7 +705,7 @@ abstract class ActiveRecord
 			$aParams = array_values($this->aNewData);
 			$aParams[] = $this->getId();
 
-			self::$oPdo->prepare($sSql)
+			self::getPdo()->prepare($sSql)
 				->execute($aParams);
 		}
 
@@ -763,7 +776,7 @@ abstract class ActiveRecord
 			return false;
 		}
 
-		self::$oPdo->prepare('DELETE FROM `' . static::getDef('sTable') . '` WHERE `' . static::getDef('sIdField') . '` = ?;')
+		self::getPdo()->prepare('DELETE FROM `' . static::getDef('sTable') . '` WHERE `' . static::getDef('sIdField') . '` = ?;')
 			->execute(array($this->getId()));
 
 		//Delete object from cache
@@ -809,7 +822,7 @@ abstract class ActiveRecord
 			WHERE `' . static::getDef('sIdField') . '` = ?
 			LIMIT 1;';
 
-		$oStmt = self::$oPdo->prepare($sSql);
+		$oStmt = self::getPdo()->prepare($sSql);
 		$oStmt->execute(array($this->getId()));
 
 		$aData = self::pdoFetchAllNested($oStmt);
