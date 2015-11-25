@@ -71,16 +71,15 @@ class User extends \AR\ActiveRecord
 ```
 
 So what is this model capable of?
-First it contains definition of the active record. Quite simple, probably doesn't need any more explanation. But then it gets interesting.
+First it contains definition of the active record. The definition contains only table's name and id field. Everything else is automatic. But then it gets interesting.
 
 It uses triggers to keep firstname and surname field value in proper format, that is every name starts with capital letter and the rest is lowercased. It is done in postGet triggers (to get proper values from DB) and preSet triggers. (So proper names are going in to the DB)
 It also uses preSave trigger to prevent saving, if saved e-mail does not include '@' character.
-(Triggers are mot required to be implemented)
 
 So...
 
 ## Triggers ##
-ActiveRecord has ability to execute different triggers. Triggers are (in order):
+ActiveRecord has ability to execute different triggers. Triggers are completely optional. Triggers are (in order):
 
 ### Get ###
 * `_preGet(field_name)`
@@ -167,12 +166,17 @@ ActiveRecord has ability to execute different triggers. Triggers are (in order):
 ## Let's play! ##
 ```php
 //Set up connection for ActiveRecord to use
-//PDO is injected with anonymous function so when it happens that PDO is never used, connection is never made
+//PDO is injected with anonymous function so when it happens
+//that PDO is never used, connection is never made
 \Ar\ActiveRecord::setPdoGetter(function(){
 	static $oPdo;
 	if(!$oPdo)
 	{
-		$oPdo = new PDO('mysql:host=localhost;dbname=db_name;charset=utf8', 'username', 'password');
+		$oPdo = new PDO(
+			'mysql:host=localhost;dbname=db_name;charset=utf8',
+			'username',
+			'password'
+		);
 	}
 	return $oPdo;
 });
@@ -259,9 +263,12 @@ So when we are asking for posts, we can refer to post table like `%self.table%` 
 ## N+1 SELECT problem? ##
 We have a solution for that too! Check that out:
 ```php
-$aPost = Post::getManyBySql(
-	"SELECT %self.table%.*, %User.table%.* FROM %self.table% INNER JOIN %User.table% ON %self.table%.%User.id% = %User.table%.%User.id%"
-);
+$aPost = Post::getManyBySql("
+	SELECT %self.table%.*, %User.table%.*
+	FROM %self.table%
+		INNER JOIN %User.table%
+			ON %self.table%.%User.id% = %User.table%.%User.id%
+");
 
 foreach($aPost as $oPost)
 {
@@ -269,7 +276,7 @@ foreach($aPost as $oPost)
 }
 ```
 **What happened?**
-As we selected data from multiple tables, ActiveRecord was able to cache all User objects what were found. (while also parsing keywords) Now when we loop through posts and ask for User model with getById() method, object is returned from cache.
+As we selected data from multiple tables, ActiveRecord was able to cache all User objects what were found. (while also parsing `%placeholders%`) Now when we loop through posts and ask for User model with getById() method, object is returned from cache.
 
 It supports all kinds of joins. It's basic SQL. So if you know, that querying out something in extra will benefit performance very well, you can do that, and ActiveRecord will cache all objects. Can it get any better?
 
