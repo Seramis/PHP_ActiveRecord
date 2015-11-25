@@ -171,13 +171,16 @@ abstract class ActiveRecord
 			{
 				$oObject = self::getObject($aMap[$sTable], $aData);
 
-				//It's our table and we don't object in resultset yet
-				if($sTable == static::getDef('sTable') && !in_array($oObject, $aResult))
+				//It's our table so add it into result
+				if($sTable == static::getDef('sTable'))
 				{
 					$aResult[] = $oObject;
 				}
 			}
 		}
+		//Remove duplicates and original array keys
+		//Tested - the ordering determined by first occurrence in array
+		$aResult = array_values(array_unique($aResult, SORT_REGULAR));
 
 		return $aResult;
 	}
@@ -255,11 +258,8 @@ abstract class ActiveRecord
 				trigger_error('Unable to find model "' . $sObject . '" while parsing query! Query: ' . $sSql, E_USER_ERROR);
 			}
 
-			//We don't need to put same thing in map multiple times
-			if(!isset($aMap[$sObject::getDef('sTable')]))
-			{
-				$aMap[$sObject::getDef('sTable')] = $sObject;
-			}
+			//Overwriting existing key is faster than checking for existence
+			$aMap[$sObject::getDef('sTable')] = $sObject;
 
 			switch($aMatches[2])
 			{
@@ -280,7 +280,7 @@ abstract class ActiveRecord
 	}
 
 	/**
-	 * Returns nested array in a form:
+	 * Fetches nested array of sql result:
 	 * array(
 	 *  table_name => array(
 	 *     row_counter => array(
@@ -385,7 +385,29 @@ abstract class ActiveRecord
 	 */
 	public function __isset($sKey)
 	{
-		return in_array($sKey, array_merge(array_keys($this->aData), array_keys($this->aNewData)));
+		//ID always exists
+		if($sKey == static::getDef('sIdField'))
+		{
+			return true;
+		}
+
+		if(array_key_exists($sKey, $this->aData) || array_key_exists($sKey, $this->aNewData))
+		{
+			return true;
+		}
+
+		//If the object is loaded, there's no way, it has that field
+		if($this->bLoaded)
+		{
+			return false;
+		}
+
+		//Load object from database, then we get full list of fields too
+		if($this->isInDb())
+		{
+			$this->load();
+		}
+		return array_key_exists($sKey, $this->aData);
 	}
 
 	/**
@@ -403,6 +425,7 @@ abstract class ActiveRecord
 	 */
 	public function __get($sKey)
 	{
+		//__isset() may trigger loading
 		if(!$this->__isset($sKey))
 		{
 			trigger_error('Trying to get non-existing property of "' . $sKey . '"!', E_USER_WARNING);
@@ -431,17 +454,13 @@ abstract class ActiveRecord
 		}
 		else
 		{
-			if($this->isInDb())
-			{
-				$this->load();
-			}
-
-			//isset() returns false on null value, but we are going to have null anyways by default
 			$mValue = null;
-			if(isset($this->aNewData[$sKey]))
+			//In first check, we need to know, if new data was set to null (and else should not exec)
+			if(array_key_exists($sKey, $this->aNewData))
 			{
 				$mValue = $this->aNewData[$sKey];
 			}
+			//Here we don't care about null value, as it will be default
 			elseif(isset($this->aData[$sKey]))
 			{
 				$mValue = $this->aData[$sKey];
@@ -527,9 +546,15 @@ abstract class ActiveRecord
 		return $mValue;
 	}
 
+	/**
+	 * Unsets (resets) the new value, that is not yet saved
+	 * (Makes the value "undirty")
+	 *
+	 * @param string $sKey
+	 */
 	public function __unset($sKey)
 	{
-		//Can't use isset, as we need to know about the key even, when value is null
+		//Can't use isset(), as we need to know about the key even, when value is null
 		if(array_key_exists($sKey, $this->aNewData))
 		{
 			unset($this->aNewData[$sKey]);
@@ -586,19 +611,30 @@ abstract class ActiveRecord
 	 */
 	public function setMany($mData)
 	{
-		foreach(static::getDef('aField') as $sField)
+		//Get all values into array
+		if(is_array($mData))
 		{
-			if(is_object($mData) && isset($mData->$sField))
-			{
-				$this->$sField = $mData->$sField;
-				continue;
-			}
+			$aData = $mData;
+		}
+		else if($mData instanceof ActiveRecord)
+		{
+			$aData = array_merge($mData->aData, $mData->aNewData);
+		}
+		else
+		{
+			$aData = get_object_vars($mData);
+		}
 
-			if(is_array($mData) && isset($mData[$sField]))
-			{
-				$this->$sField = $mData[$sField];
-				continue;
-			}
+		//Unset id if it exists in dataset
+		if(array_key_exists(self::getDef('sIdField'), $aData))
+		{
+			unset($aData[self::getDef('sIdField')]);
+		}
+
+		//Set all values from dataset
+		foreach($aData as $sKey => $mValue)
+		{
+			$this->$sKey = $mValue;
 		}
 
 		return true;
@@ -766,7 +802,7 @@ abstract class ActiveRecord
 
 	/**
 	 * Deletes object from DB.
-	 * Object will stay, in php, you can not destroy yourself.
+	 * Object will stay in local php variable, you can not destroy yourself.
 	 *
 	 * Will trigger events:
 	 *    _preDelete()
@@ -834,10 +870,9 @@ abstract class ActiveRecord
 
 		$oStmt = self::getPdo()->prepare($sSql);
 		$oStmt->execute(array($this->getId()));
+		$aData = $oStmt->fetch(\PDO::FETCH_ASSOC);
 
-		$aData = self::pdoFetchAllNested($oStmt);
-
-		return $this->loadFromArray($aData[static::getDef('sTable')][0]);
+		return $this->loadFromArray($aData);
 	}
 
 	/**
