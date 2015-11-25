@@ -219,7 +219,7 @@ abstract class ActiveRecord
 		if(!isset(self::$aCache[$sObject][$sId]))
 		{
 			self::$aCache[$sObject][$sId] = new $sObject();
-			self::$aCache[$sObject][$sId]->init($sId);
+			self::$aCache[$sObject][$sId]->init($sId); //Because this is the same class, it is accessible
 		}
 
 		/** @var ActiveRecord $oObject */
@@ -245,7 +245,7 @@ abstract class ActiveRecord
 	{
 		$aMap = array();
 
-		//Match all placeholders like: %blah.blah%
+		//Match all placeholders like: %\ns\class.field%
 		while(preg_match('#\%([A-Za-z_\\\\]*?)\.([A-Za-z]*?)\%#', $sSql, $aMatches))
 		{
 			$sObject = self::getClassName($aMatches[1]);
@@ -436,12 +436,13 @@ abstract class ActiveRecord
 				$this->load();
 			}
 
+			//isset() returns false on null value, but we are going to have null anyways by default
 			$mValue = null;
-			if(array_key_exists($sKey, $this->aNewData))
+			if(isset($this->aNewData[$sKey]))
 			{
 				$mValue = $this->aNewData[$sKey];
 			}
-			elseif(array_key_exists($sKey, $this->aData))
+			elseif(isset($this->aData[$sKey]))
 			{
 				$mValue = $this->aData[$sKey];
 			}
@@ -485,7 +486,7 @@ abstract class ActiveRecord
 		$mOldValue = null;
 		if($this->bLoaded)
 		{
-			$mOldValue = array_key_exists($sKey, $this->aData) ? $this->aData[$sKey] : null;
+			$mOldValue = isset($this->aData[$sKey]) ? $this->aData[$sKey] : null;
 		}
 
 		//_pre events
@@ -507,6 +508,7 @@ abstract class ActiveRecord
 		$this->aNewData[$sKey] = $mValue;
 
 		//If we are loaded and we can see, that new value is same as old one, no need to keep that value.
+		//Can't use isset, as we need to know about the key even, when value is null
 		if($this->bLoaded && array_key_exists($sKey, $this->aData) && $this->aNewData[$sKey] == $this->aData[$sKey])
 		{
 			unset($this->aNewData[$sKey]);
@@ -527,6 +529,7 @@ abstract class ActiveRecord
 
 	public function __unset($sKey)
 	{
+		//Can't use isset, as we need to know about the key even, when value is null
 		if(array_key_exists($sKey, $this->aNewData))
 		{
 			unset($this->aNewData[$sKey]);
@@ -568,6 +571,7 @@ abstract class ActiveRecord
 	{
 		if($sFieldName !== null)
 		{
+			//Can't use isset, as we need to know about the key even, when value is null
 			return array_key_exists($sFieldName, $this->aNewData);
 		}
 
@@ -665,7 +669,7 @@ abstract class ActiveRecord
 		foreach($this->aNewData as $sKey => &$mValue)
 		{
 			$mOldValue = null;
-			if(array_key_exists($sKey, $this->aData))
+			if(isset($this->aData[$sKey]))
 			{
 				$mOldValue = $this->aData[$sKey];
 			}
@@ -724,7 +728,7 @@ abstract class ActiveRecord
 		foreach($aNewData as $sKey => $mValue)
 		{
 			$mOldValue = null;
-			if(array_key_exists($sKey, $aOldData))
+			if(isset($aOldData[$sKey]))
 			{
 				$mOldValue = $aOldData[$sKey];
 			}
@@ -864,7 +868,7 @@ abstract class ActiveRecord
 		foreach(array_keys($aData) as $sField)
 		{
 			$mOldValue = null;
-			if(array_key_exists($sField, $this->aData))
+			if(isset($this->aData[$sField]))
 			{
 				$mOldValue = $this->aData[$sField];
 			}
@@ -885,7 +889,7 @@ abstract class ActiveRecord
 		foreach(array_keys($aData) as $sField)
 		{
 			$mOldValue = null;
-			if(array_key_exists($sField, $aOldData))
+			if(isset($aOldData[$sField]))
 			{
 				$mOldValue = $aOldData[$sField];
 			}

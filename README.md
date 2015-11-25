@@ -24,13 +24,7 @@ class User extends \AR\ActiveRecord
 {
 	protected static $aDefinition = array(
 		'sTable' => 'user',
-		'sIdField' => 'user_id',
-		'aField' => array(
-			'user_id',
-			'firstname',
-			'surname',
-			'mail'
-		)
+		'sIdField' => 'user_id'
 	);
 
 	protected function _postGet_firstname(&$sFirstName)
