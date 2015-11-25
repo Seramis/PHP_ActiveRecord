@@ -167,6 +167,12 @@ abstract class ActiveRecord
 		$aResult = array();
 		foreach($aResultSet as $sTable => $aRowList)
 		{
+			//The field is something abstract and doesn't have a table. Don't do anything
+			if(!$sTable)
+			{
+				continue;
+			}
+
 			foreach($aRowList as $aData)
 			{
 				$oObject = self::getObject($aMap[$sTable], $aData);
